@@ -108,6 +108,23 @@ osbuild/
 
 ### Building Images
 
+**🐳 Docker Build** (Recommended - Zero Installation):
+```bash
+# Only Docker required - no other dependencies!
+git clone https://github.com/altyrus/osbuild.git
+cd osbuild
+./docker-build-simple.sh
+
+# Custom output location
+./docker-build-simple.sh /path/to/output
+
+# Different Kubernetes version
+./docker-build-simple.sh ./output 1.29.0
+```
+✅ Works on Linux, macOS, Windows | ✅ Completely isolated | ✅ Reproducible
+
+See [Docker Build Guide](docs/DOCKER_BUILD.md) for complete documentation.
+
 **Automated (GitHub Actions):**
 - Push to `main` branch triggers automatic build
 - Tag with `v*` creates a release with artifacts
