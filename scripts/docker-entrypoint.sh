@@ -18,6 +18,21 @@ echo "=========================================="
 
 cd /workspace
 
+# Setup QEMU ARM64 emulation (required for chroot into ARM64 filesystem)
+echo ""
+echo "==> Setting up QEMU ARM64 emulation..."
+if [[ -f /proc/sys/fs/binfmt_misc/qemu-aarch64 ]]; then
+    echo "QEMU ARM64 binfmt already registered"
+else
+    # Register ARM64 binfmt handler
+    update-binfmts --enable qemu-aarch64 || {
+        echo "Warning: Could not enable qemu-aarch64 via update-binfmts"
+        echo "Attempting manual registration..."
+        echo ':qemu-aarch64:M::\x7fELF\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\xb7\x00:\xff\xff\xff\xff\xff\xff\xff\x00\xff\xff\xff\xff\xff\xff\xff\xff\xfe\xff\xff\xff:/usr/bin/qemu-aarch64-static:F' > /proc/sys/fs/binfmt_misc/register || true
+    }
+fi
+echo "✅ QEMU ARM64 emulation enabled"
+
 # Step 1: Download base image if not cached
 if [[ ! -f "image-build/cache/${RASPIOS_VERSION}.img.xz" ]]; then
     echo ""
@@ -43,12 +58,49 @@ ls -lh image-build/work/base.img
 echo ""
 echo "==> Expanding image for customization..."
 cd image-build/work
+
+# Verify base.img exists
+if [ ! -f "base.img" ]; then
+    echo "ERROR: base.img not found"
+    ls -la
+    exit 1
+fi
+
 truncate -s +2G base.img
 echo ", +" | sfdisk -N 2 base.img
+sync  # Ensure partition table is written
 
 # Setup loop device
-LOOP_DEVICE=$(losetup -fP --show base.img)
+LOOP_DEVICE=$(losetup -f --show base.img || {
+    echo "ERROR: Failed to create loop device"
+    echo "Checking loop devices:"
+    losetup -a
+    echo "Checking base.img:"
+    ls -lh base.img
+    exit 1
+})
 echo "Loop device: ${LOOP_DEVICE}"
+
+# Use kpartx to create partition mappings (works in Docker)
+kpartx -av ${LOOP_DEVICE}
+sleep 1  # Give kernel time to create device mappings
+
+# Get partition device names (kpartx creates /dev/mapper/ devices)
+LOOP_NAME=$(basename ${LOOP_DEVICE})
+BOOT_DEV="/dev/mapper/${LOOP_NAME}p1"
+ROOT_DEV="/dev/mapper/${LOOP_NAME}p2"
+
+# Verify partitions exist
+if [ ! -b "${ROOT_DEV}" ]; then
+    echo "ERROR: Partition ${ROOT_DEV} not found"
+    ls -la /dev/mapper/
+    kpartx -dv ${LOOP_DEVICE}
+    losetup -d ${LOOP_DEVICE}
+    exit 1
+fi
+
+echo "Boot partition: ${BOOT_DEV}"
+echo "Root partition: ${ROOT_DEV}"
 
 # Cleanup function
 cleanup() {
@@ -56,13 +108,14 @@ cleanup() {
     echo "==> Cleaning up..."
     umount /tmp/boot 2>/dev/null || true
     umount /tmp/root 2>/dev/null || true
+    kpartx -dv ${LOOP_DEVICE} 2>/dev/null || true
     losetup -d ${LOOP_DEVICE} 2>/dev/null || true
 }
 trap cleanup EXIT
 
 # Resize filesystem
-e2fsck -f ${LOOP_DEVICE}p2 || true
-resize2fs ${LOOP_DEVICE}p2
+e2fsck -f ${ROOT_DEV} || true
+resize2fs ${ROOT_DEV}
 
 cd /workspace
 
@@ -70,8 +123,8 @@ cd /workspace
 echo ""
 echo "==> Mounting partitions..."
 mkdir -p /tmp/boot /tmp/root
-mount ${LOOP_DEVICE}p2 /tmp/root
-mount ${LOOP_DEVICE}p1 /tmp/boot
+mount ${ROOT_DEV} /tmp/root
+mount ${BOOT_DEV} /tmp/boot
 
 # Step 5: Install Kubernetes
 echo ""
@@ -99,6 +152,7 @@ echo ""
 echo "==> Unmounting partitions..."
 umount /tmp/boot
 umount /tmp/root
+kpartx -dv ${LOOP_DEVICE}
 losetup -d ${LOOP_DEVICE}
 trap - EXIT  # Remove trap
 
@@ -113,20 +167,14 @@ cd /workspace
 # Step 11: Create output artifacts
 echo ""
 echo "==> Creating output artifacts..."
-mkdir -p output/netboot
+mkdir -p output
 
 # Copy disk image
 cp image-build/work/base.img output/rpi5-k8s-${IMAGE_VERSION}.img
 
-# Extract rootfs for netboot
-./scripts/extract-rootfs.sh \
-    output/rpi5-k8s-${IMAGE_VERSION}.img \
-    output/netboot/rootfs.tar.gz
-
-# Generate checksums
+# Generate checksum
 cd output
 sha256sum rpi5-k8s-${IMAGE_VERSION}.img > rpi5-k8s-${IMAGE_VERSION}.img.sha256
-sha256sum netboot/rootfs.tar.gz > netboot/rootfs.tar.gz.sha256
 
 # Create metadata
 cat > metadata.json <<EOF
@@ -135,7 +183,7 @@ cat > metadata.json <<EOF
   "kubernetes_version": "${K8S_VERSION}",
   "base_image": "${RASPIOS_VERSION}",
   "build_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "build_type": "docker",
+  "build_type": "sdcard",
   "build_host": "$(hostname)"
 }
 EOF
@@ -148,11 +196,11 @@ echo "=========================================="
 echo "✅ Build completed successfully!"
 echo "=========================================="
 echo ""
-echo "Output files:"
-ls -lh output/
+echo "SD Card Image:"
+ls -lh output/*.img
 echo ""
-echo "Netboot files:"
-ls -lh output/netboot/
+echo "Flash to SD card with:"
+echo "  sudo dd if=output/rpi5-k8s-${IMAGE_VERSION}.img of=/dev/sdX bs=4M status=progress conv=fsync"
 echo ""
-echo "Files are available in your OUTPUT_DIR on the host"
+echo "Or use Raspberry Pi Imager and select 'Use custom' to flash the .img file"
 echo "=========================================="

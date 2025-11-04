@@ -1,0 +1,29 @@
+# Git directory
+.git
+.github
+
+# Build artifacts and cache
+image-build/cache
+image-build/work
+output
+test-output
+
+# Documentation and notes
+docs
+*.md
+NOTES.md
+claude.md
+
+# Editor and IDE files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# GitHub workflows (not needed in container)
+.github

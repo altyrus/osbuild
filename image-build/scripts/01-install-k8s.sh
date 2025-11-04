@@ -125,13 +125,33 @@ chroot_exec systemctl disable kubelet
 echo "Installing CNI plugins..."
 mkdir -p "${ROOT_PATH}/opt/cni/bin"
 CNI_VERSION="v1.4.0"
-curl -L "https://github.com/containernetworking/plugins/releases/download/${CNI_VERSION}/cni-plugins-linux-arm64-${CNI_VERSION}.tgz" | \
-    tar -C "${ROOT_PATH}/opt/cni/bin" -xz
+CNI_URL="https://github.com/containernetworking/plugins/releases/download/${CNI_VERSION}/cni-plugins-linux-arm64-${CNI_VERSION}.tgz"
+
+for i in 1 2 3; do
+    echo "Downloading CNI plugins (attempt $i)..."
+    if curl --retry 3 --retry-delay 2 --fail -L "$CNI_URL" -o /tmp/cni.tgz; then
+        tar -C "${ROOT_PATH}/opt/cni/bin" -xzf /tmp/cni.tgz
+        rm /tmp/cni.tgz
+        break
+    fi
+    [ $i -eq 3 ] && { echo "ERROR: Failed to download CNI plugins after 3 attempts"; exit 1; }
+    sleep 5
+done
 
 echo "Installing crictl..."
 CRICTL_VERSION="v1.28.0"
-curl -L "https://github.com/kubernetes-sigs/cri-tools/releases/download/${CRICTL_VERSION}/crictl-${CRICTL_VERSION}-linux-arm64.tar.gz" | \
-    tar -C "${ROOT_PATH}/usr/local/bin" -xz
+CRICTL_URL="https://github.com/kubernetes-sigs/cri-tools/releases/download/${CRICTL_VERSION}/crictl-${CRICTL_VERSION}-linux-arm64.tar.gz"
+
+for i in 1 2 3; do
+    echo "Downloading crictl (attempt $i)..."
+    if curl --retry 3 --retry-delay 2 --fail -L "$CRICTL_URL" -o /tmp/crictl.tar.gz; then
+        tar -C "${ROOT_PATH}/usr/local/bin" -xzf /tmp/crictl.tar.gz
+        rm /tmp/crictl.tar.gz
+        break
+    fi
+    [ $i -eq 3 ] && { echo "ERROR: Failed to download crictl after 3 attempts"; exit 1; }
+    sleep 5
+done
 
 echo "Configuring crictl..."
 cat > "${ROOT_PATH}/etc/crictl.yaml" <<EOF

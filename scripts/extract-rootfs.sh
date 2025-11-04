@@ -30,30 +30,36 @@ MOUNT_DIR=$(mktemp -d)
 cleanup() {
     echo "Cleaning up..."
     if mountpoint -q "$MOUNT_DIR"; then
-        sudo umount "$MOUNT_DIR" || true
+        umount "$MOUNT_DIR" || true
     fi
-    sudo losetup -d "$LOOP_DEVICE" 2>/dev/null || true
+    kpartx -dv "$LOOP_DEVICE" 2>/dev/null || true
+    losetup -d "$LOOP_DEVICE" 2>/dev/null || true
     rm -rf "$MOUNT_DIR"
 }
 
 trap cleanup EXIT
 
 echo "Setting up loop device..."
-LOOP_DEVICE=$(sudo losetup -fP --show "$DISK_IMAGE")
+LOOP_DEVICE=$(losetup -f --show "$DISK_IMAGE")
 echo "Loop device: $LOOP_DEVICE"
 
-# Wait for partition devices
+# Use kpartx for Docker compatibility
+kpartx -av "$LOOP_DEVICE"
 sleep 1
 
+# Get partition device names
+LOOP_NAME=$(basename "$LOOP_DEVICE")
+ROOT_DEV="/dev/mapper/${LOOP_NAME}p2"
+
 echo "Mounting root partition..."
-sudo mount "${LOOP_DEVICE}p2" "$MOUNT_DIR"
+mount "${ROOT_DEV}" "$MOUNT_DIR"
 
 echo "Creating tarball..."
 OUTPUT_DIR=$(dirname "$OUTPUT_TAR")
 mkdir -p "$OUTPUT_DIR"
 
 # Create tarball preserving permissions and attributes
-sudo tar -czf "$OUTPUT_TAR" \
+tar -czf "$OUTPUT_TAR" \
     --numeric-owner \
     --preserve-permissions \
     --xattrs \

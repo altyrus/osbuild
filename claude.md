@@ -767,4 +767,186 @@ The key insight: Don't fight the Kubernetes philosophy of ephemeral nodes. Embra
 
 ---
 
-**Document Status**: Updated 2025-11-03 with project setup completion and team collaboration details.
+## Latest Development Updates (2025-11-04)
+
+### Pivot to SD Card Boot Focus
+
+**Decision**: Changed from hybrid netboot/NVMe approach to SD card boot as primary deployment method.
+
+**Rationale**:
+- Simplify initial implementation
+- SD cards are readily available and easy to work with
+- Netboot requires additional infrastructure (DHCP/TFTP/NFS servers)
+- Can always add netboot support later if needed
+- Focus on getting a working system first
+
+### Docker-Based Build System ✅ COMPLETED
+
+**Implementation**: Pure Docker build system requiring only Docker as dependency.
+
+**Key Features**:
+- No host system pollution - all build tools run inside Docker
+- QEMU ARM64 emulation with binfmt handlers
+- Builds bootable .img files for SD cards
+- Comprehensive verification scripts
+- Automatic image shrinking and optimization
+
+**Build Process**:
+```bash
+./docker-build-simple.sh ./output 1.28.0
+```
+
+Produces:
+- `rpi5-k8s-VERSION.img` - Bootable SD card image (~3.9GB)
+- `metadata.json` - Build information
+- `rpi5-k8s-VERSION.img.sha256` - Checksum
+
+**Technical Details**:
+- Base: Raspberry Pi OS Lite 64-bit (Bookworm)
+- Kubernetes: 1.28.0 (containerd, kubeadm, kubelet, kubectl)
+- CNI plugins: v1.4.0
+- crictl: v1.28.0
+- containerd: 1.6.20
+- Image expansion: +2GB for Kubernetes components
+- Optimization: Shrunk to minimum size with 512-byte sector alignment
+
+### Verification System ✅ COMPLETED
+
+**Files Created**:
+- `scripts/verify-image.sh` - Comprehensive static verification
+- `scripts/docker-verify.sh` - Docker wrapper for privileged operations
+
+**Verification Checks**:
+- Boot partition and configuration (cgroups enabled)
+- Kubernetes binaries (containerd, kubeadm, kubelet, kubectl, crictl)
+- CNI plugins installation
+- Systemd services (containerd, kubelet, first-boot, SSH)
+- Bootstrap framework (`/opt/bootstrap/bootstrap.sh`)
+- Configuration files (containerd, kubelet, sysctl, modules-load)
+- SSH configuration (keys-only authentication)
+- System configuration (hostname, hosts, swap disabled)
+- Required packages (git, curl, jq)
+
+**Usage**:
+```bash
+./scripts/docker-verify.sh ./output/rpi5-k8s-*.img
+```
+
+### Technical Issues Resolved
+
+**Issue 1: Sector Alignment**
+- Problem: Images not divisible by 512 bytes
+- Symptom: `losetup` warnings about file not fitting into 512-byte sectors
+- Fix: Added alignment logic to `shrink-image.sh` (lines 97-100)
+- Result: All images now properly aligned to 512-byte boundaries
+
+**Issue 2: Loop Device Permissions**
+- Problem: `losetup` requires sudo/root permissions
+- Solution: Created Docker wrapper script (`docker-verify.sh`)
+- Result: Verification runs in privileged Docker container with required tools
+
+**Issue 3: kpartx for Docker Compatibility**
+- Problem: Standard loop device partition access doesn't work well in Docker
+- Solution: Use kpartx for partition mapping
+- Result: Reliable partition access in Docker environment
+
+### Project Structure Updates
+
+**New Scripts**:
+```
+scripts/
+├── docker-entrypoint.sh         # Docker container entry point
+├── shrink-image.sh              # Shrink image to minimum size (with alignment)
+├── extract-rootfs.sh            # Extract rootfs from image
+├── verify-image.sh              # Verify image contents (NEW)
+└── docker-verify.sh             # Run verification in Docker (NEW)
+```
+
+**Build Artifacts**:
+```
+output/
+├── rpi5-k8s-docker-TIMESTAMP.img
+├── rpi5-k8s-docker-TIMESTAMP.img.sha256
+└── metadata.json
+```
+
+### Current Status
+
+**Completed ✅**:
+- Docker-based build system
+- Image building with Kubernetes 1.28.0
+- Bootstrap framework installation
+- First-boot systemd service
+- Static image verification
+- Sector alignment fixes
+- Documentation updates (README.md, claude.md)
+
+**In Progress 🔄**:
+- QEMU boot testing (pending resource cleanup)
+- GitHub repository sync
+
+**Pending ⏳**:
+- QEMU testing implementation
+- Physical Raspberry Pi 5 hardware testing
+- Bootstrap repository creation (k8s-bootstrap)
+- End-to-end provisioning testing
+
+### Known Issues
+
+**Loop Device Exhaustion**:
+- System has 47 loop devices in use from previous build attempts
+- Blocks new builds with: `losetup: failed to set up loop device`
+- Solution: System cleanup/reboot needed
+- Note: Build 702580 completed successfully (exit code 0), proving build system works
+
+### Next Steps
+
+1. Complete documentation sync to GitHub
+2. System cleanup to free loop devices
+3. Create QEMU testing script for boot validation
+4. Run full build → verify → QEMU test cycle
+5. Begin bootstrap repository development
+
+### Build System Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Docker Build (Pure Docker - No dependencies!)          │
+│  ├─ Download Raspberry Pi OS Lite ARM64                 │
+│  ├─ Expand image with QEMU ARM64 emulation             │
+│  ├─ Install Kubernetes 1.28.0                           │
+│  ├─ Install bootstrap framework                         │
+│  ├─ Configure first-boot auto-provisioning              │
+│  ├─ Shrink and optimize image (512-byte aligned)        │
+│  └─ Output: bootable .img file for SD card              │
+└─────────────────────────────────────────────────────────┘
+                        ↓
+┌─────────────────────────────────────────────────────────┐
+│  Verification (Docker-based)                             │
+│  ├─ Mount image in privileged container                 │
+│  ├─ Verify Kubernetes components                        │
+│  ├─ Verify systemd services                             │
+│  ├─ Verify bootstrap framework                          │
+│  └─ Verify system configuration                         │
+└─────────────────────────────────────────────────────────┘
+                        ↓
+┌─────────────────────────────────────────────────────────┐
+│  QEMU Testing (Pending)                                  │
+│  ├─ Boot image in QEMU ARM64 emulator                   │
+│  ├─ Monitor boot process                                │
+│  ├─ Verify first-boot service execution                 │
+│  └─ Validate system readiness                           │
+└─────────────────────────────────────────────────────────┘
+                        ↓
+┌─────────────────────────────────────────────────────────┐
+│  Flash to SD Card                                        │
+│  - Use dd command or Raspberry Pi Imager                │
+│  - Boot Raspberry Pi 5 from SD card                     │
+│  - First-boot service auto-provisions node              │
+│  - Joins Kubernetes cluster automatically               │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+**Document Status**: Updated 2025-11-04 with Docker build system completion, verification implementation, and current project status.
