@@ -1,0 +1,28 @@
+[Unit]
+Description=First Boot Node Provisioning
+Documentation=https://github.com/altyrus/osbuild
+After=network-online.target
+Wants=network-online.target
+Before=kubelet.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/bootstrap/bootstrap.sh
+RemainAfterExit=yes
+StandardOutput=journal+console
+StandardError=journal+console
+TimeoutStartSec=600
+Restart=no
+
+# Logging
+SyslogIdentifier=first-boot
+
+# Security
+ReadWritePaths=/var/lib /var/log
+PrivateTmp=yes
+
+# Environment
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+[Install]
+WantedBy=multi-user.target

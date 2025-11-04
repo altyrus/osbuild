@@ -1,0 +1,57 @@
+# Build artifacts
+output/
+*.img
+*.img.xz
+*.tar.gz
+*.sha256
+
+# Cache directories
+image-build/cache/
+image-build/work/
+
+# Temporary files
+*.tmp
+*.temp
+/tmp/
+
+# Logs
+*.log
+
+# macOS
+.DS_Store
+
+# Linux
+*~
+.directory
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+.vim/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Secrets (just in case)
+*.key
+*.pem
+*.p12
+*secret*
+*credentials*
+.env
+
+# Test files
+test-output/

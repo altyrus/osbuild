@@ -78,38 +78,64 @@ Nodes are identified by:
 
 ```
 osbuild/
-├── image-build/              # Packer/pi-gen configurations
-│   ├── packer/
-│   ├── scripts/
-│   └── files/
-├── bootstrap/                # Bootstrap scripts (can be separate repo)
-│   ├── setup.sh
-│   ├── config/
-│   ├── scripts/
-│   └── manifests/
-├── netboot/                  # Netboot server configuration
-│   ├── dnsmasq.conf
-│   └── nfs-exports
 ├── .github/
 │   └── workflows/
-│       └── build-image.yml
-└── docs/
+│       └── build-image.yml          # GitHub Actions CI/CD pipeline
+├── image-build/
+│   ├── scripts/                     # Build scripts (run in CI)
+│   │   ├── 01-install-k8s.sh       # Install Kubernetes components
+│   │   ├── 02-install-bootstrap.sh  # Install bootstrap framework
+│   │   ├── 03-configure-firstboot.sh # Configure first-boot
+│   │   └── 04-cleanup.sh            # Optimize image
+│   ├── files/                       # Files embedded in image
+│   │   ├── bootstrap/
+│   │   │   └── bootstrap.sh         # First-boot provisioning script
+│   │   └── systemd/
+│   │       └── first-boot.service   # Systemd service
+│   ├── cache/                       # Downloaded images (gitignored)
+│   └── work/                        # Build workspace (gitignored)
+├── scripts/                         # Helper scripts
+│   ├── extract-rootfs.sh            # Extract rootfs from image
+│   ├── shrink-image.sh              # Shrink image to minimum size
+│   ├── deploy-netboot.sh            # Deploy to netboot server
+│   └── build-local.sh               # Local build for testing
+├── output/                          # Build outputs (gitignored)
+├── netboot/                         # Netboot server configuration (future)
+└── docs/                            # Documentation (future)
 ```
 
 ## Quick Start
 
+### Building Images
+
+**Automated (GitHub Actions):**
+- Push to `main` branch triggers automatic build
+- Tag with `v*` creates a release with artifacts
+- Artifacts: disk.img, rootfs.tar.gz, checksums
+
+**Local Build:**
+```bash
+./scripts/build-local.sh [kubernetes_version]
+```
+
 ### Development (Netboot)
 
-1. Build image via CI/CD
-2. Deploy rootfs to NFS server
-3. Configure netboot server (dnsmasq + NFS)
+1. Build image via CI/CD or locally
+2. Deploy rootfs to NFS server:
+   ```bash
+   ./scripts/deploy-netboot.sh output/netboot/rootfs.tar.gz YOUR_SERVER
+   ```
+3. Configure netboot server (dnsmasq + NFS) - see Phase 2
 4. Boot Raspberry Pi 5 from network
 5. Node auto-provisions and joins cluster
 
 ### Production (NVMe)
 
-1. Download built image from releases
-2. Flash to NVMe: `dd if=disk.img of=/dev/nvme0n1 bs=4M status=progress`
+1. Download built image from releases or build locally
+2. Flash to NVMe:
+   ```bash
+   sudo dd if=rpi5-k8s-VERSION.img of=/dev/nvme0n1 bs=4M status=progress conv=fsync
+   ```
 3. Insert NVMe into Raspberry Pi 5
 4. Power on - node auto-provisions and joins cluster
 
@@ -165,13 +191,31 @@ nodes:
 - Deploy same image to NVMe for production
 - Single build pipeline for both
 
-## Roadmap
+## Implementation Status
 
-- [ ] Phase 1: CI/CD pipeline for image building
-- [ ] Phase 2: Netboot dev environment setup
-- [ ] Phase 3: Bootstrap script development
-- [ ] Phase 4: NVMe production validation
-- [ ] Phase 5: Operational procedures and monitoring
+- [x] **Phase 1: CI/CD Pipeline** ✓ COMPLETED
+  - [x] GitHub Actions workflow for automated builds
+  - [x] Build scripts for image customization
+  - [x] Bootstrap framework with first-boot service
+  - [x] Helper scripts for extraction and deployment
+  - [x] Local build support for testing
+- [ ] **Phase 2: Netboot Dev Environment**
+  - [ ] Netboot server configuration (dnsmasq + NFS)
+  - [ ] Deployment automation
+  - [ ] Testing with physical Raspberry Pi 5 nodes
+- [ ] **Phase 3: Bootstrap Script Development**
+  - [ ] Create k8s-bootstrap repository
+  - [ ] Node inventory management (nodes.yaml)
+  - [ ] Kubernetes init/join scripts
+  - [ ] End-to-end provisioning
+- [ ] **Phase 4: NVMe Production Validation**
+  - [ ] Flash and test on NVMe hardware
+  - [ ] Production deployment procedures
+  - [ ] Performance validation
+- [ ] **Phase 5: Operations**
+  - [ ] Monitoring and metrics
+  - [ ] Update procedures
+  - [ ] Runbooks and documentation
 
 ## Contributing
 
