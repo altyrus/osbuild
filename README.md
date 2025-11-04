@@ -118,6 +118,14 @@ osbuild/
 ./scripts/build-local.sh [kubernetes_version]
 ```
 
+**Self-Hosted Runner** (Unlimited Free Builds):
+```bash
+# One-time setup (15 minutes)
+./scripts/setup-runner.sh
+# Update workflow to: runs-on: self-hosted
+# Enjoy unlimited builds on your hardware!
+```
+
 **Download Built Images:**
 ```bash
 # Download latest build from GitHub Actions
@@ -128,6 +136,7 @@ gh release download v0.1.0
 ```
 
 See [Storage Setup Guide](docs/STORAGE_SETUP.md) for Google Drive integration and storage options.
+See [Local Builds Guide](docs/LOCAL_BUILDS.md) for act, Docker, and self-hosted runner details.
 
 ### Development (Netboot)
 
