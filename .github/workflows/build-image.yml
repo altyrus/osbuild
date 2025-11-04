@@ -154,11 +154,43 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: raspberry-pi-images-${{ env.IMAGE_VERSION }}
+        retention-days: 7  # Keep for 7 days only (save storage quota)
         path: |
           output/*.img
           output/*.sha256
           output/metadata.json
           output/netboot/*
+
+    - name: Upload to Google Drive
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      env:
+        RCLONE_CONFIG: ${{ secrets.RCLONE_CONFIG }}
+      run: |
+        if [ -z "$RCLONE_CONFIG" ]; then
+          echo "⏭️  Skipping Google Drive upload (RCLONE_CONFIG not set)"
+          echo "To enable: Add RCLONE_CONFIG secret in GitHub repo settings"
+        else
+          echo "📤 Uploading to Google Drive..."
+
+          # Install rclone
+          curl https://rclone.org/install.sh | sudo bash
+
+          # Configure rclone from secret
+          mkdir -p ~/.config/rclone
+          echo "$RCLONE_CONFIG" > ~/.config/rclone/rclone.conf
+
+          # Create dated directory name
+          BUILD_DATE=$(date +%Y-%m-%d)
+          DEST_DIR="osbuild-images/${BUILD_DATE}-${GITHUB_SHA:0:7}"
+
+          # Upload files
+          rclone copy output/rpi5-k8s-${IMAGE_VERSION}.img gdrive:${DEST_DIR}/
+          rclone copy output/rpi5-k8s-${IMAGE_VERSION}.img.sha256 gdrive:${DEST_DIR}/
+          rclone copy output/metadata.json gdrive:${DEST_DIR}/
+          rclone copy output/netboot/rootfs.tar.gz gdrive:${DEST_DIR}/netboot/
+
+          echo "✅ Uploaded to Google Drive: ${DEST_DIR}"
+        fi
 
     - name: Deploy to netboot server (dev)
       if: github.ref == 'refs/heads/main' && github.event_name == 'push'

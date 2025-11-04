@@ -118,6 +118,17 @@ osbuild/
 ./scripts/build-local.sh [kubernetes_version]
 ```
 
+**Download Built Images:**
+```bash
+# Download latest build from GitHub Actions
+./scripts/download-artifacts.sh
+
+# Download from releases
+gh release download v0.1.0
+```
+
+See [Storage Setup Guide](docs/STORAGE_SETUP.md) for Google Drive integration and storage options.
+
 ### Development (Netboot)
 
 1. Build image via CI/CD or locally
