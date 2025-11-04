@@ -117,7 +117,7 @@ jobs:
 
         # Shrink image to minimum size
         cd image-build/work
-        sudo ./image-build/../scripts/shrink-image.sh base.img
+        sudo ../../scripts/shrink-image.sh base.img
 
     - name: Create output artifacts
       run: |
