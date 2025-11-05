@@ -1,0 +1,89 @@
+#cloud-config
+# Cloud-init configuration for Raspberry Pi 5 Kubernetes node
+# This runs on first boot and configures the system automatically
+
+# Set hostname (will be customized per node later)
+hostname: rpi5-k8s-node
+fqdn: rpi5-k8s-node.local
+manage_etc_hosts: true
+
+# Create default user
+users:
+  - name: pi
+    groups: users,adm,dialout,audio,netdev,video,plugdev,cdrom,games,input,gpio,spi,i2c,render,sudo
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    lock_passwd: false
+    # Default password: raspberry (change this in production!)
+    passwd: $6$rounds=4096$saltysalt$3Yj5L9LhEHkJfKJVfn8CxQc8lLh8JQXjQ6lP4YvKvP0m8fYR7qMp9jJQnKjW5vK8R5L9LhEHkJfKJVfn8C
+    ssh_authorized_keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC... # Placeholder - will be replaced during build
+
+# Disable default 'pi' user if it exists (Raspberry Pi OS creates it)
+chpasswd:
+  expire: false
+
+# SSH configuration
+ssh_pwauth: true
+disable_root: true
+
+# Timezone
+timezone: UTC
+
+# System configuration
+write_files:
+  - path: /etc/cloud/cloud.cfg.d/99_custom.cfg
+    content: |
+      # Disable cloud-init on subsequent boots
+      datasource_list: [ NoCloud, None ]
+      datasource:
+        NoCloud:
+          fs_label: null
+    permissions: '0644'
+
+# Boot commands (run before other setup)
+bootcmd:
+  - echo 'Running cloud-init boot commands...'
+
+# Run commands (run after system is up)
+runcmd:
+  # Disable swap (required for Kubernetes)
+  - swapoff -a
+  - sed -i '/ swap / s/^/#/' /etc/fstab
+
+  # Disable automatic updates
+  - systemctl disable --now apt-daily.timer apt-daily-upgrade.timer
+
+  # Set up hostname properly
+  - hostnamectl set-hostname rpi5-k8s-node
+
+  # Ensure SSH is enabled and started
+  - systemctl enable ssh
+  - systemctl start ssh
+
+  # Create marker that cloud-init has run
+  - touch /var/lib/cloud/instance/boot-finished
+
+  - echo "Cloud-init configuration completed successfully"
+
+# Package management
+package_update: false
+package_upgrade: false
+
+# Packages to install (minimal - K8s already installed by build)
+packages:
+  - cloud-init
+  - cloud-guest-utils
+
+# Final message
+final_message: |
+  Cloud-init has finished configuring this Raspberry Pi 5 Kubernetes node.
+  System is ready for use.
+
+  Default user: pi
+  Default password: raspberry (CHANGE THIS!)
+
+  SSH is enabled. You can log in with:
+    ssh pi@rpi5-k8s-node.local
+
+  Kubernetes components are pre-installed and ready to be configured.

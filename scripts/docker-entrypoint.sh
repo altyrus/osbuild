@@ -131,16 +131,10 @@ echo ""
 echo "==> Installing Kubernetes ${K8S_VERSION}..."
 ./image-build/scripts/01-install-k8s.sh /tmp/root "${K8S_VERSION}"
 
-# Step 6: Install bootstrap framework
+# Step 6: Install and configure cloud-init
 echo ""
-echo "==> Installing bootstrap framework..."
-./image-build/scripts/02-install-bootstrap.sh /tmp/root
-
-# Step 7: Configure first-boot
-echo ""
-echo "==> Configuring first-boot service..."
-export GITHUB_SHA="${IMAGE_VERSION}"
-./image-build/scripts/03-configure-firstboot.sh /tmp/root
+echo "==> Installing and configuring cloud-init..."
+./image-build/scripts/02-install-cloudinit.sh /tmp/root
 
 # Step 8: Cleanup and optimize
 echo ""

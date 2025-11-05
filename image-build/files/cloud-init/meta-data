@@ -1,0 +1,2 @@
+instance-id: rpi5-k8s-node-$(date +%s)
+local-hostname: rpi5-k8s-node
