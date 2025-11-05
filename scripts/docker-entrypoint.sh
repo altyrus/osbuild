@@ -150,11 +150,9 @@ kpartx -dv ${LOOP_DEVICE}
 losetup -d ${LOOP_DEVICE}
 trap - EXIT  # Remove trap
 
-# Step 10: Shrink image
+# Step 10: Shrink image (DISABLED for testing - image will be larger)
 echo ""
-echo "==> Shrinking image..."
-cd image-build/work
-../../scripts/shrink-image.sh base.img
+echo "==> Skipping image shrinking (using unshrunk image for testing)..."
 
 cd /workspace
 
