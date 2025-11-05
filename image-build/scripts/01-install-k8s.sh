@@ -54,18 +54,36 @@ echo "Setting up QEMU ARM64 emulation..."
 cp /usr/bin/qemu-aarch64-static "${ROOT_PATH}/usr/bin/" || true
 
 echo "Updating package lists..."
-chroot_exec apt-get update
+for i in 1 2 3; do
+    echo "Running apt-get update (attempt $i)..."
+    if chroot_exec apt-get update; then
+        break
+    fi
+    [ $i -eq 3 ] && { echo "ERROR: apt-get update failed after 3 attempts"; exit 1; }
+    echo "Cleaning apt cache and retrying..."
+    chroot_exec apt-get clean
+    sleep 5
+done
 
 echo "Installing prerequisites..."
-chroot_exec apt-get install -y \
-    apt-transport-https \
-    ca-certificates \
-    curl \
-    gnupg \
-    software-properties-common \
-    git \
-    jq \
-    wget
+for i in 1 2 3; do
+    echo "Installing prerequisites (attempt $i)..."
+    if chroot_exec apt-get install -y \
+        apt-transport-https \
+        ca-certificates \
+        curl \
+        gnupg \
+        git \
+        jq \
+        wget; then
+        break
+    fi
+    [ $i -eq 3 ] && { echo "ERROR: Failed to install prerequisites after 3 attempts"; exit 1; }
+    echo "Cleaning apt cache and retrying..."
+    chroot_exec apt-get clean
+    chroot_exec apt-get update || true
+    sleep 5
+done
 
 echo "Disabling swap..."
 chroot_exec systemctl mask swap.target || true
@@ -86,7 +104,17 @@ net.ipv4.ip_forward                 = 1
 EOF
 
 echo "Installing containerd..."
-chroot_exec apt-get install -y containerd
+for i in 1 2 3; do
+    echo "Installing containerd (attempt $i)..."
+    if chroot_exec apt-get install -y containerd; then
+        break
+    fi
+    [ $i -eq 3 ] && { echo "ERROR: Failed to install containerd after 3 attempts"; exit 1; }
+    echo "Cleaning apt cache and retrying..."
+    chroot_exec apt-get clean
+    chroot_exec apt-get update || true
+    sleep 5
+done
 
 echo "Configuring containerd..."
 mkdir -p "${ROOT_PATH}/etc/containerd"
@@ -110,11 +138,31 @@ echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.
     tee "${ROOT_PATH}/etc/apt/sources.list.d/kubernetes.list"
 
 echo "Installing Kubernetes packages..."
-chroot_exec apt-get update
-chroot_exec apt-get install -y \
-    kubelet="${K8S_VERSION}-*" \
-    kubeadm="${K8S_VERSION}-*" \
-    kubectl="${K8S_VERSION}-*"
+for i in 1 2 3; do
+    echo "Running apt-get update (attempt $i)..."
+    if chroot_exec apt-get update; then
+        break
+    fi
+    [ $i -eq 3 ] && { echo "ERROR: apt-get update failed after 3 attempts"; exit 1; }
+    echo "Cleaning apt cache and retrying..."
+    chroot_exec apt-get clean
+    sleep 5
+done
+
+for i in 1 2 3; do
+    echo "Installing Kubernetes packages (attempt $i)..."
+    if chroot_exec apt-get install -y \
+        kubelet="${K8S_VERSION}-*" \
+        kubeadm="${K8S_VERSION}-*" \
+        kubectl="${K8S_VERSION}-*"; then
+        break
+    fi
+    [ $i -eq 3 ] && { echo "ERROR: Failed to install Kubernetes packages after 3 attempts"; exit 1; }
+    echo "Cleaning apt cache and retrying..."
+    chroot_exec apt-get clean
+    chroot_exec apt-get update || true
+    sleep 5
+done
 
 echo "Holding Kubernetes packages..."
 chroot_exec apt-mark hold kubelet kubeadm kubectl
