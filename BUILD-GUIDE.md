@@ -33,6 +33,7 @@ OSBuild creates customized Debian 13 (Trixie) images with Kubernetes 1.28.0 pre-
 - **Cloud-Init**: Automated provisioning with NoCloud datasource
 - **Network Ready**: Virtio networking (x64) or native networking (Pi5)
 - **Kubernetes Optimized**: Swap disabled, kernel modules and sysctl pre-configured
+- **Platform Integration**: Pre-installed dependencies for Platform project (storage, networking, HA)
 
 ### Build Features
 
@@ -153,6 +154,8 @@ Centralized configuration for:
 | **Container Runtime** | containerd 1.7.24 |
 | **CNI Plugins** | v1.4.0 (optional, can be installed during provisioning) |
 | **crictl** | v1.28.0 |
+| **helm** | v3.16.3 |
+| **Platform Dependencies** | open-iscsi 2.1.11, nfs-common 2.8.3, haproxy 3.0.11 |
 | **Image Size** | 5GB (sparse, ~1.1GB actual) |
 | **Filesystem** | ext4 |
 | **Boot** | GRUB (cloud image default) |
@@ -166,6 +169,8 @@ Centralized configuration for:
 | **Kernel** | Linux 6.12 (Pi-optimized) |
 | **Kubernetes** | 1.28.0 |
 | **Container Runtime** | containerd 1.7.24 |
+| **helm** | v3.16.3 |
+| **Platform Dependencies** | open-iscsi 2.1.11, nfs-common 2.8.3, haproxy 3.0.11 |
 | **Image Size** | ~4GB |
 | **Filesystem** | ext4 |
 | **Boot** | Raspberry Pi bootloader |
@@ -348,6 +353,30 @@ These images are designed to work seamlessly with the [Platform Project](../plat
 
 5. **Containerd Configuration**: Pre-configured with SystemdCgroup for Kubernetes compatibility
 
+6. **Storage Dependencies Pre-Installed**: open-iscsi and nfs-common for Longhorn storage support
+
+7. **HA Dependencies Pre-Installed**: HAProxy for load balancing and HA configurations
+
+8. **Helm Pre-Installed**: v3.16.3 for Kubernetes package management
+
+### Benefits of Pre-Installed Dependencies
+
+**Reduced Deployment Time**:
+- Platform scripts skip package installation when dependencies are already present
+- Faster cluster provisioning, especially for multi-node clusters
+
+**Reduced Network Bandwidth**:
+- ~200-300MB of packages per node already installed
+- Critical for Pi5 deployments with limited bandwidth or offline environments
+
+**Increased Reliability**:
+- No network failures during deployment due to package download issues
+- Consistent package versions across all nodes
+
+**Offline Capability**:
+- Nodes only need connectivity to each other, not to internet package repositories
+- Ideal for air-gapped or restricted network environments
+
 ### Using with Platform
 
 1. **For libvirt/KVM deployment** (x64):
@@ -412,18 +441,20 @@ ALLOW_PASSWORD="yes"               # OSBuild enables SSH password auth
 5. Mount root filesystem
 6. Setup chroot (proc, sys, dev)
 7. Update apt repositories
-8. Install prerequisites
-9. Configure Kubernetes prerequisites (swap, modules, sysctl)
-10. Install containerd
-11. Add Kubernetes repository
-12. Install Kubernetes packages (kubelet, kubeadm, kubectl)
-13. Install CNI plugins (with retry logic)
-14. Install crictl
-15. Embed cloud-init configuration (NoCloud)
-16. Cleanup chroot
-17. Unmount and sync
-18. Copy to output directory
-19. Generate checksums and metadata
+8. Install prerequisites (git, jq, gnupg, wget, curl, etc.)
+9. Install Platform dependencies (open-iscsi, nfs-common, haproxy)
+10. Configure Kubernetes prerequisites (swap, modules, sysctl)
+11. Install containerd
+12. Add Kubernetes repository
+13. Install Kubernetes packages (kubelet, kubeadm, kubectl)
+14. Install CNI plugins (with retry logic)
+15. Install crictl
+16. Install helm
+17. Embed cloud-init configuration (NoCloud)
+18. Cleanup chroot
+19. Unmount and sync
+20. Copy to output directory
+21. Generate checksums and metadata
 ```
 
 ### Pi5 Build Flow

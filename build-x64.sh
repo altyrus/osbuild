@@ -126,6 +126,17 @@ apt_retry "${ROOT_PATH}" "Install prerequisites" "apt-get install -y \
     jq \
     wget"
 
+# Install Platform dependencies (storage, networking, HA)
+log_info "Installing Platform integration dependencies..."
+apt_retry "${ROOT_PATH}" "Install Platform dependencies" "apt-get install -y \
+    open-iscsi \
+    nfs-common \
+    haproxy"
+
+log_info "Enabling open-iscsi service..."
+chroot_exec "${ROOT_PATH}" "systemctl enable open-iscsi" || true
+chroot_exec "${ROOT_PATH}" "systemctl enable iscsid" || true
+
 # Disable swap
 disable_swap "${ROOT_PATH}"
 
@@ -210,6 +221,16 @@ runtime-endpoint: unix:///run/containerd/containerd.sock
 image-endpoint: unix:///run/containerd/containerd.sock
 timeout: 10
 EOF
+
+# Install helm
+log_info "Installing helm..."
+HELM_VERSION="v3.16.3"
+HELM_URL="https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz"
+
+curl --retry 3 -L "${HELM_URL}" | tar -xz -C /tmp
+mv /tmp/linux-amd64/helm "${ROOT_PATH}/usr/local/bin/helm"
+chmod +x "${ROOT_PATH}/usr/local/bin/helm"
+rm -rf /tmp/linux-amd64
 
 # Configure cloud-init - Debian cloud images already have cloud-init
 log_info "Configuring cloud-init..."

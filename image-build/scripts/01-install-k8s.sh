@@ -85,6 +85,26 @@ for i in 1 2 3; do
     sleep 5
 done
 
+echo "Installing Platform integration dependencies..."
+for i in 1 2 3; do
+    echo "Installing Platform dependencies (attempt $i)..."
+    if chroot_exec apt-get install -y \
+        open-iscsi \
+        nfs-common \
+        haproxy; then
+        break
+    fi
+    [ $i -eq 3 ] && { echo "ERROR: Failed to install Platform dependencies after 3 attempts"; exit 1; }
+    echo "Cleaning apt cache and retrying..."
+    chroot_exec apt-get clean
+    chroot_exec apt-get update || true
+    sleep 5
+done
+
+echo "Enabling open-iscsi service..."
+chroot_exec systemctl enable open-iscsi || true
+chroot_exec systemctl enable iscsid || true
+
 echo "Disabling swap..."
 chroot_exec systemctl mask swap.target || true
 chroot_exec swapoff -a || true
@@ -207,6 +227,23 @@ runtime-endpoint: unix:///run/containerd/containerd.sock
 image-endpoint: unix:///run/containerd/containerd.sock
 timeout: 10
 EOF
+
+echo "Installing helm..."
+HELM_VERSION="v3.16.3"
+HELM_URL="https://get.helm.sh/helm-${HELM_VERSION}-linux-arm64.tar.gz"
+
+for i in 1 2 3; do
+    echo "Downloading helm (attempt $i)..."
+    if curl --retry 3 --retry-delay 2 --fail -L "$HELM_URL" -o /tmp/helm.tar.gz; then
+        tar -C /tmp -xzf /tmp/helm.tar.gz
+        mv /tmp/linux-arm64/helm "${ROOT_PATH}/usr/local/bin/helm"
+        chmod +x "${ROOT_PATH}/usr/local/bin/helm"
+        rm -rf /tmp/helm.tar.gz /tmp/linux-arm64
+        break
+    fi
+    [ $i -eq 3 ] && { echo "WARNING: Failed to download helm after 3 attempts. Can be installed during deployment."; }
+    sleep 5
+done
 
 echo "=========================================="
 echo "Kubernetes installation completed"
