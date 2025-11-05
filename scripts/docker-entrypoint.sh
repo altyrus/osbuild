@@ -40,7 +40,7 @@ if [[ ! -f "image-build/cache/${RASPIOS_VERSION}.img.xz" ]]; then
     mkdir -p image-build/cache
     cd image-build/cache
     wget -q --show-progress \
-        "https://downloads.raspberrypi.com/raspios_lite_arm64/images/raspios_lite_arm64-2024-07-04/${RASPIOS_VERSION}.img.xz"
+        "https://downloads.raspberrypi.com/raspios_lite_arm64/images/raspios_lite_arm64-2025-10-02/${RASPIOS_VERSION}.img.xz"
     cd /workspace
     echo "✅ Download complete"
 else
@@ -114,7 +114,7 @@ cleanup() {
 trap cleanup EXIT
 
 # Resize filesystem
-e2fsck -f ${ROOT_DEV} || true
+e2fsck -f -y ${ROOT_DEV} || true
 resize2fs ${ROOT_DEV}
 
 cd /workspace
@@ -144,10 +144,34 @@ echo "==> Cleaning up and optimizing..."
 # Step 9: Unmount and finalize
 echo ""
 echo "==> Unmounting partitions..."
-umount /tmp/boot
-umount /tmp/root
+# Sync all pending writes
+sync
+sleep 2
+
+# Force unmount with retries
+echo "Unmounting /tmp/boot..."
+umount /tmp/boot || umount -l /tmp/boot || true
+echo "Unmounting /tmp/root..."
+umount /tmp/root || umount -l /tmp/root || true
+
+# Final sync
+sync
+sleep 1
+
+# Remove device mappings
+echo "Removing device mappings..."
 kpartx -dv ${LOOP_DEVICE}
+sleep 1
+
+# Remove loop device
+echo "Removing loop device..."
 losetup -d ${LOOP_DEVICE}
+
+# Critical: Sync after loop device detach to flush all buffered writes
+echo "Final sync after loop device detach..."
+sync
+sleep 3
+
 trap - EXIT  # Remove trap
 
 # Step 10: Shrink image (DISABLED for testing - image will be larger)
@@ -161,8 +185,18 @@ echo ""
 echo "==> Creating output artifacts..."
 mkdir -p output
 
+# Critical: Final sync before copying to ensure base.img is fully written
+echo "Syncing filesystem before copy..."
+sync
+sleep 2
+
 # Copy disk image
+echo "Copying image file..."
 cp image-build/work/base.img output/rpi5-k8s-${IMAGE_VERSION}.img
+
+# Ensure copied file is synced
+sync
+echo "Image copy complete and synced"
 
 # Generate checksum
 cd output

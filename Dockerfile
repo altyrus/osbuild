@@ -39,7 +39,7 @@ RUN mkdir -p /workspace/output
 # Set environment variables with defaults
 ENV K8S_VERSION=1.28.0
 ENV IMAGE_VERSION=docker-build
-ENV RASPIOS_VERSION=2024-07-04-raspios-bookworm-arm64-lite
+ENV RASPIOS_VERSION=2025-10-01-raspios-trixie-arm64-lite
 
 # Entry point runs the build
 CMD ["/workspace/scripts/docker-entrypoint.sh"]
