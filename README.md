@@ -1,10 +1,31 @@
-# OSBuild - Raspberry Pi 5 OS Image Builder
+# OSBuild - Zero-Touch Kubernetes Deployment System
 
-Automated OS image building and deployment system for Raspberry Pi 5 Kubernetes clusters.
+Automated OS image building and deployment system for x64 and Raspberry Pi 5 Kubernetes clusters with zero-touch provisioning.
+
+## ⚠️ Current Status
+
+**Date:** 2025-11-06
+**Status:** Core functionality working, VIP networking issues under investigation
+
+### What Works
+✅ Autonomous VM/baremetal boot
+✅ Kubernetes cluster initialization
+✅ All services deploy (Flannel, MetalLB, Ingress, Longhorn, MinIO, Prometheus, Grafana, Portainer)
+✅ Internal cluster networking
+✅ SSH access and kubectl functionality
+
+### Known Issues
+❌ VIP (192.168.1.30) not accessible from external network
+❌ MetalLB L2 ARP announcements not working
+❌ Second IP not auto-applied on boot (requires manual configuration)
+
+**See [SUCCESSFUL-FIX-REPORT.md](SUCCESSFUL-FIX-REPORT.md) for detailed status and [BUILD-COMPLETE.md](BUILD-COMPLETE.md) for deployment guide.**
+
+---
 
 ## Overview
 
-OSBuild provides a Docker-based build system for creating bootable Raspberry Pi 5 images with Kubernetes pre-installed.
+OSBuild provides a zero-touch deployment system for creating bootable images with Kubernetes pre-installed.
 
 **Current Focus**: SD card boot images (netboot planned for future phase)
 
