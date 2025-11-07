@@ -155,6 +155,12 @@ EOF
     kubectl taint nodes --all node-role.kubernetes.io/control-plane- 2>&1 | tee -a "$BOOTSTRAP_LOG" || true
     kubectl taint nodes --all node-role.kubernetes.io/master- 2>&1 | tee -a "$BOOTSTRAP_LOG" || true
 
+    # Remove exclude-from-external-load-balancers label for single-node clusters
+    # This label prevents MetalLB from announcing LoadBalancer services on control-plane nodes
+    # In single-node deployments, we MUST allow the control-plane to handle load balancer traffic
+    log_info "Removing exclude-from-external-load-balancers label (required for MetalLB)"
+    kubectl label nodes --all node.kubernetes.io/exclude-from-external-load-balancers- 2>&1 | tee -a "$BOOTSTRAP_LOG" || true
+
     mark_complete "k8s-init"
 fi
 
