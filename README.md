@@ -107,12 +107,15 @@ Nodes are identified by:
 
 ```
 osbuild/
+├── build-all.sh                     # Unified build script (all platforms)
+├── build-x64.sh                     # x64 image builder
+├── build-pi5.sh                     # Raspberry Pi 5 image builder (Docker-based)
+├── build-zerotouch.sh               # Zero-touch image customization
 ├── Dockerfile                       # Docker build environment
 ├── .dockerignore                    # Docker build exclusions
-├── docker-build-simple.sh           # Main build script (Docker-based)
 ├── .github/
 │   └── workflows/
-│       └── build-image.yml          # GitHub Actions CI/CD pipeline (TODO)
+│       └── build-images.yml         # GitHub Actions CI/CD pipeline
 ├── image-build/
 │   ├── scripts/                     # Build scripts (run inside Docker)
 │   │   ├── 01-install-k8s.sh       # Install Kubernetes components
@@ -161,19 +164,50 @@ Key settings: PRIVATE_SUBNET, EXTERNAL_SUBNET, VIP, NODE_COUNT
 
 See [ZERO-TOUCH-README.md](ZERO-TOUCH-README.md) for complete setup guide.
 
-### Building an Image
+### Building Images
 
-**Build with Docker** (Only requirement: Docker):
+#### Option 1: Unified Build (Recommended)
+
+Build both x64 and Pi5 images with a single command:
+
 ```bash
 git clone https://github.com/altyrus/osbuild.git
 cd osbuild
-./docker-build-simple.sh
+
+# Configure environment (required for zero-touch)
+cp .env.sample .env
+nano .env
+
+# Build both platforms
+./build-all.sh
+
+# Build specific platform
+./build-all.sh --platform=x64    # Only x64
+./build-all.sh --platform=pi5    # Only Pi5
+```
+
+**Features:**
+- Single entry point for all platforms
+- Automatic prerequisite checks
+- Unified output summary
+- GitHub Actions compatible
+
+#### Option 2: Individual Platform Builds
+
+**Pi5 Images** (Only requirement: Docker):
+```bash
+./build-pi5.sh
 
 # Custom output location
-./docker-build-simple.sh ./my-output
+./build-pi5.sh ./my-output
 
 # Different Kubernetes version
-./docker-build-simple.sh ./output 1.29.0
+./build-pi5.sh ./output 1.29.0
+```
+
+**x64 Images** (Requires QEMU/KVM):
+```bash
+sudo ./build-x64.sh
 ```
 
 Build takes 15-30 minutes and produces:

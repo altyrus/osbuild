@@ -1,0 +1,141 @@
+name: Build Kubernetes Images
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'build-**.sh'
+      - 'image-build/**'
+      - 'scripts/**'
+      - 'bootstrap/**'
+      - 'manifests/**'
+      - '.github/workflows/build-images.yml'
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build (x64, pi5, or all)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - x64
+          - pi5
+
+jobs:
+  build:
+    name: Build ${{ inputs.platform || 'all' }} platform(s)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up environment
+        run: |
+          # Install required packages
+          sudo apt-get update
+          sudo apt-get install -y \
+            qemu-system-x86-64 \
+            qemu-utils \
+            qemu-user-static \
+            kpartx \
+            parted \
+            e2fsprogs
+
+          # Create .env if it doesn't exist (use sample)
+          if [ ! -f .env ]; then
+            cp .env.sample .env || echo "No .env.sample found, continuing without .env"
+          fi
+
+      - name: Check Docker
+        run: |
+          docker info
+          docker version
+
+      - name: Free up disk space
+        run: |
+          # Remove unnecessary packages to free up space
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          df -h
+
+      - name: Build images
+        env:
+          PLATFORM: ${{ inputs.platform || 'all' }}
+        run: |
+          ./build-all.sh --platform=$PLATFORM
+
+      - name: List outputs
+        run: |
+          echo "Build outputs:"
+          find output* -name "*.img" -o -name "*.img.sha256" -o -name "metadata.json" 2>/dev/null || true
+          df -h
+
+      - name: Upload x64 artifacts
+        if: inputs.platform == 'all' || inputs.platform == 'x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: osbuild-x64-images
+          path: |
+            output-zerotouch-x64/*.img
+            output-zerotouch-x64/*.img.sha256
+            output-zerotouch-x64/metadata.json
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Upload pi5 artifacts
+        if: inputs.platform == 'all' || inputs.platform == 'pi5'
+        uses: actions/upload-artifact@v4
+        with:
+          name: osbuild-pi5-images
+          path: |
+            output-zerotouch-pi5/*.img
+            output-zerotouch-pi5/*.img.sha256
+            output-zerotouch-pi5/metadata.json
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Generate build summary
+        run: |
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Platform:** ${{ inputs.platform || 'all' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Date:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Output Files" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          find output* -name "*.img" -exec ls -lh {} \; 2>/dev/null | awk '{print "- `" $9 "` - " $5}' >> $GITHUB_STEP_SUMMARY || echo "No images found" >> $GITHUB_STEP_SUMMARY
+
+  # Optional: Create release on tag push
+  release:
+    name: Create Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            artifacts/**/*.img
+            artifacts/**/*.img.sha256
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -96,9 +96,9 @@ if [ ! -f "$BASE_IMAGE" ]; then
         BASE_IMAGE="$SCRIPT_DIR/output-x64/k8s-x64-latest.img"
 
     elif [ "$BUILD_PLATFORM" = "pi5" ]; then
-        echo "Running: $SCRIPT_DIR/docker-build.sh"
+        echo "Running: $SCRIPT_DIR/build-pi5.sh"
         cd "$SCRIPT_DIR"
-        ./docker-build.sh
+        ./build-pi5.sh
 
         # Find the latest built image
         LATEST_IMAGE=$(ls -t "$SCRIPT_DIR/output"/rpi5-k8s-*.img 2>/dev/null | head -1)

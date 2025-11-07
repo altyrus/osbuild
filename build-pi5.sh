@@ -1,11 +1,12 @@
 #!/bin/bash
 #
-# docker-build-simple.sh - Pure Docker build (no docker-compose needed)
+# build-pi5.sh - Raspberry Pi 5 Image Builder
 #
+# Pure Docker build (no docker-compose needed)
 # Ultra-portable: Only requires Docker, nothing else
 #
 # Usage:
-#   ./docker-build-simple.sh [output_dir] [k8s_version]
+#   ./build-pi5.sh [output_dir] [k8s_version]
 #
 
 set -euo pipefail
@@ -26,7 +27,7 @@ CACHE_DIR=$(cd "${CACHE_DIR}" && pwd)
 PROJECT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 echo "=========================================="
-echo "OSBuild - Docker Build (Simple)"
+echo "OSBuild - Raspberry Pi 5 Image Builder"
 echo "=========================================="
 echo "Project: ${PROJECT_DIR}"
 echo "Output: ${OUTPUT_DIR}"

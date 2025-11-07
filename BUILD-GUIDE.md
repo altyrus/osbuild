@@ -92,7 +92,7 @@ sudo ./build-x64.sh
 
 ```bash
 cd /POOL01/software/projects/osbuild
-sudo ./docker-build.sh
+./build-pi5.sh
 ```
 
 **Build time**: ~15-20 minutes (first build downloads base image)
@@ -105,7 +105,7 @@ sudo ./docker-build.sh
 ```
 osbuild/
 ├── build-x64.sh                 # x64 build script
-├── docker-build.sh              # Pi5 Docker build wrapper
+├── build-pi5.sh                 # Pi5 image builder (Docker-based)
 ├── lib/
 │   └── common.sh                # Shared functions
 ├── config/

@@ -28,13 +28,13 @@ git clone https://github.com/altyrus/osbuild.git
 cd osbuild
 
 # Build with defaults (output to ./output, K8s 1.28.0)
-./docker-build-simple.sh
+./build-pi5.sh
 
 # Custom output directory
-./docker-build-simple.sh /path/to/output
+./build-pi5.sh /path/to/output
 
 # Custom Kubernetes version
-./docker-build-simple.sh ./output 1.29.0
+./build-pi5.sh ./output 1.29.0
 ```
 
 **That's it!** Image will be in your output directory in 15-30 minutes.
@@ -48,10 +48,10 @@ git clone https://github.com/altyrus/osbuild.git
 cd osbuild
 
 # Build with defaults
-./docker-build.sh
+./build-pi5.sh
 
 # Custom settings
-OUTPUT_DIR=/path/to/output K8S_VERSION=1.29.0 ./docker-build.sh
+OUTPUT_DIR=/path/to/output K8S_VERSION=1.29.0 ./build-pi5.sh
 ```
 
 ### Method 3: Pure Docker Commands
@@ -89,21 +89,21 @@ output/
 ### Basic Build
 
 ```bash
-./docker-build-simple.sh
+./build-pi5.sh
 # Output: ./output/rpi5-k8s-*.img
 ```
 
 ### Custom Output Location
 
 ```bash
-./docker-build-simple.sh /mnt/storage/images
+./build-pi5.sh /mnt/storage/images
 # Output: /mnt/storage/images/rpi5-k8s-*.img
 ```
 
 ### Different Kubernetes Version
 
 ```bash
-./docker-build-simple.sh ./output 1.29.0
+./build-pi5.sh ./output 1.29.0
 # Builds with Kubernetes 1.29.0
 ```
 
@@ -111,20 +111,20 @@ output/
 
 ```bash
 # First build downloads base image (~500MB)
-./docker-build-simple.sh
+./build-pi5.sh
 
 # Second build reuses cache (much faster)
-./docker-build-simple.sh
+./build-pi5.sh
 ```
 
 ### Parallel Builds (Different Versions)
 
 ```bash
 # Terminal 1: Build K8s 1.28
-OUTPUT_DIR=./output-1.28 K8S_VERSION=1.28.0 ./docker-build-simple.sh
+OUTPUT_DIR=./output-1.28 K8S_VERSION=1.28.0 ./build-pi5.sh
 
 # Terminal 2: Build K8s 1.29
-OUTPUT_DIR=./output-1.29 K8S_VERSION=1.29.0 ./docker-build-simple.sh
+OUTPUT_DIR=./output-1.29 K8S_VERSION=1.29.0 ./build-pi5.sh
 ```
 
 ## Environment Variables
@@ -143,7 +143,7 @@ Example:
 export OUTPUT_DIR=/mnt/storage
 export K8S_VERSION=1.29.0
 export IMAGE_VERSION=my-custom-v1
-./docker-build-simple.sh
+./build-pi5.sh
 ```
 
 ## How It Works
@@ -191,7 +191,7 @@ Everything is self-contained in the container.
 ### Custom Kubernetes Version
 
 ```bash
-./docker-build-simple.sh ./output 1.30.0
+./build-pi5.sh ./output 1.30.0
 ```
 
 ### Custom Base Image
@@ -199,7 +199,7 @@ Everything is self-contained in the container.
 Edit `Dockerfile` or set environment variable:
 ```bash
 export RASPIOS_VERSION=2024-10-01-raspios-bookworm-arm64-lite
-./docker-build-simple.sh
+./build-pi5.sh
 ```
 
 ### Modify Build Scripts
@@ -213,7 +213,7 @@ Build scripts are copied into the image:
 Then rebuild the Docker image:
 ```bash
 docker build -t osbuild:latest .
-./docker-build-simple.sh
+./build-pi5.sh
 ```
 
 ## Troubleshooting
@@ -312,7 +312,7 @@ build-image:
     - docker:dind
   script:
     - cd osbuild
-    - ./docker-build-simple.sh /builds/output
+    - ./build-pi5.sh /builds/output
   artifacts:
     paths:
       - /builds/output/*.img
@@ -324,7 +324,7 @@ build-image:
 # PowerShell
 git clone https://github.com/altyrus/osbuild.git
 cd osbuild
-.\docker-build-simple.sh C:\output
+.\build-pi5.sh C:\output
 ```
 
 ### Build on macOS
@@ -333,7 +333,7 @@ cd osbuild
 # Same as Linux
 git clone https://github.com/altyrus/osbuild.git
 cd osbuild
-./docker-build-simple.sh ./output
+./build-pi5.sh ./output
 ```
 
 ### Automated Builds with Cron
@@ -343,7 +343,7 @@ cd osbuild
 crontab -e
 
 # Add:
-0 2 * * * cd /home/user/osbuild && ./docker-build-simple.sh /mnt/storage/images/$(date +\%Y\%m\%d)
+0 2 * * * cd /home/user/osbuild && ./build-pi5.sh /mnt/storage/images/$(date +\%Y\%m\%d)
 ```
 
 ## Performance Tips
@@ -352,7 +352,7 @@ crontab -e
 
 ```bash
 # Faster writes
-./docker-build-simple.sh /mnt/ssd/output
+./build-pi5.sh /mnt/ssd/output
 ```
 
 ### Increase Docker Resources
@@ -369,7 +369,7 @@ Don't delete `./image-build/cache/` between builds - it contains the 500MB base 
 ## FAQ
 
 **Q: Do I need docker-compose?**
-A: No, use `docker-build-simple.sh` for pure Docker.
+A: No, use `build-pi5.sh` for pure Docker.
 
 **Q: Can I run this in CI/CD?**
 A: Yes, any CI/CD with Docker support works.
@@ -393,7 +393,7 @@ A: Needed for loop devices to mount image partitions. Container is isolated and 
 ```bash
 git clone https://github.com/altyrus/osbuild.git
 cd osbuild
-./docker-build-simple.sh
+./build-pi5.sh
 # Wait 15-30 minutes
 # Image is in ./output/
 ```
