@@ -3,6 +3,11 @@
 # build-x64.sh - Build x64 image with virtio support for QEMU/KVM testing
 # Uses Debian 13 (Trixie) cloud image as base
 #
+# LESSONS LEARNED (2025-11-07):
+# - 120GB disk required for full service stack (MinIO 50GB + services 30GB + OS 7GB + buffer 33GB)
+# - 40GB insufficient: causes Longhorn PVC faults for MinIO/Grafana/Prometheus/Portainer
+# - Ensure partition expansion works: cloud-init-growroot must run on first boot
+#
 
 set -euo pipefail
 
@@ -42,21 +47,78 @@ log_info "Output: ${OUTPUT_DIR}"
 log_info "==========================================="
 
 # Download base image if not cached
-if [[ ! -f "${CACHE_DIR}/${BASE_IMAGE_NAME}" ]]; then
+if [[ ! -f "${CACHE_DIR}/${BASE_IMAGE_NAME}" ]] || [[ ! -s "${CACHE_DIR}/${BASE_IMAGE_NAME}" ]]; then
     log_info "Downloading ${X64_OS_NAME} cloud image..."
-    wget -O "${CACHE_DIR}/${BASE_IMAGE_NAME}" "${BASE_IMAGE_URL}"
+    # Remove any empty or corrupted cached file
+    rm -f "${CACHE_DIR}/${BASE_IMAGE_NAME}"
+
+    # Download with retries
+    DOWNLOAD_SUCCESS=false
+    for attempt in 1 2 3; do
+        log_info "Download attempt ${attempt}/3..."
+        if wget -O "${CACHE_DIR}/${BASE_IMAGE_NAME}" "${BASE_IMAGE_URL}"; then
+            # Verify the download is a valid qcow2 image
+            if qemu-img info "${CACHE_DIR}/${BASE_IMAGE_NAME}" >/dev/null 2>&1; then
+                log_info "Download successful and verified"
+                DOWNLOAD_SUCCESS=true
+                break
+            else
+                log_error "Downloaded file is not a valid qcow2 image"
+                rm -f "${CACHE_DIR}/${BASE_IMAGE_NAME}"
+            fi
+        fi
+        log_info "Download attempt ${attempt} failed, retrying in 5 seconds..."
+        sleep 5
+    done
+
+    if [ "$DOWNLOAD_SUCCESS" = false ]; then
+        log_error "Failed to download base image after 3 attempts"
+        exit 1
+    fi
 else
     log_info "Using cached base image"
+    # Verify cached image is valid
+    if ! qemu-img info "${CACHE_DIR}/${BASE_IMAGE_NAME}" >/dev/null 2>&1; then
+        log_error "Cached image is corrupted, removing and re-downloading..."
+        rm -f "${CACHE_DIR}/${BASE_IMAGE_NAME}"
+        exec "$0" "$@"
+    fi
 fi
 
 # Convert qcow2 to raw and expand
 log_info "Converting and expanding image to ${TARGET_SIZE}..."
-qemu-img convert -f qcow2 -O raw "${CACHE_DIR}/${BASE_IMAGE_NAME}" "${WORK_DIR}/base.img"
-qemu-img resize "${WORK_DIR}/base.img" "${TARGET_SIZE}"
+if ! qemu-img convert -f qcow2 -O raw "${CACHE_DIR}/${BASE_IMAGE_NAME}" "${WORK_DIR}/base.img"; then
+    log_error "Failed to convert qcow2 image to raw format"
+    exit 1
+fi
+
+if ! qemu-img resize "${WORK_DIR}/base.img" "${TARGET_SIZE}"; then
+    log_error "Failed to resize image to ${TARGET_SIZE}"
+    exit 1
+fi
+
+# Verify the converted image
+if [[ ! -f "${WORK_DIR}/base.img" ]] || [[ ! -s "${WORK_DIR}/base.img" ]]; then
+    log_error "Converted image is missing or empty"
+    exit 1
+fi
+
+log_info "Image conversion and resize completed successfully"
 
 # Setup loop device
 log_info "Setting up loop device..."
 LOOP_DEVICE=$(losetup -f --show "${WORK_DIR}/base.img")
+
+if [[ -z "${LOOP_DEVICE}" ]]; then
+    log_error "Failed to setup loop device"
+    exit 1
+fi
+
+if [[ ! -b "${LOOP_DEVICE}" ]]; then
+    log_error "Loop device ${LOOP_DEVICE} is not a block device"
+    exit 1
+fi
+
 log_info "Loop device: ${LOOP_DEVICE}"
 
 # Cleanup function
@@ -80,17 +142,30 @@ cleanup() {
 trap cleanup EXIT
 
 # Re-read partition table
+log_info "Reading partition table..."
 partprobe "${LOOP_DEVICE}"
 sleep 2
 
 # Debian cloud images typically have partition 1 as root
 ROOT_PART="${LOOP_DEVICE}p1"
 
-# Check if partition exists
-if [[ ! -b "${ROOT_PART}" ]]; then
-    log_error "Root partition ${ROOT_PART} not found"
+# Check if partition exists with retries (sometimes takes a moment to appear)
+PARTITION_FOUND=false
+for attempt in 1 2 3 4 5; do
+    if [[ -b "${ROOT_PART}" ]]; then
+        PARTITION_FOUND=true
+        break
+    fi
+    log_info "Waiting for partition to appear (attempt ${attempt}/5)..."
+    partprobe "${LOOP_DEVICE}" 2>/dev/null || true
+    sleep 2
+done
+
+if [ "$PARTITION_FOUND" = false ]; then
+    log_error "Root partition ${ROOT_PART} not found after 5 attempts"
     log_info "Available devices:"
     ls -la /dev/loop* || true
+    fdisk -l "${LOOP_DEVICE}" || true
     exit 1
 fi
 
@@ -99,14 +174,29 @@ log_info "Root partition: ${ROOT_PART}"
 # Resize filesystem
 log_info "Resizing filesystem..."
 e2fsck -f -y "${ROOT_PART}" || true
-resize2fs "${ROOT_PART}"
+
+if ! resize2fs "${ROOT_PART}"; then
+    log_error "Failed to resize filesystem"
+    exit 1
+fi
 
 # Mount root
 log_info "Mounting root filesystem..."
 mkdir -p /tmp/x64-root
-mount "${ROOT_PART}" /tmp/x64-root
+
+if ! mount "${ROOT_PART}" /tmp/x64-root; then
+    log_error "Failed to mount root filesystem"
+    exit 1
+fi
+
+# Verify mount
+if ! mountpoint -q /tmp/x64-root; then
+    log_error "Mount verification failed"
+    exit 1
+fi
 
 ROOT_PATH="/tmp/x64-root"
+log_info "Root filesystem mounted successfully"
 
 # Setup chroot
 setup_chroot "${ROOT_PATH}"
@@ -213,7 +303,22 @@ log_info "Installing crictl..."
 CRICTL_VERSION="v1.28.0"
 CRICTL_URL="https://github.com/kubernetes-sigs/cri-tools/releases/download/${CRICTL_VERSION}/crictl-${CRICTL_VERSION}-linux-amd64.tar.gz"
 
-curl --retry 3 -L "${CRICTL_URL}" | tar -C "${ROOT_PATH}/usr/local/bin" -xz
+# Download crictl with retries (SSL errors are intermittent)
+CRICTL_DOWNLOADED=false
+for i in 1 2 3 4 5; do
+    log_info "Downloading crictl (attempt $i/5)..."
+    if curl --retry 2 --retry-delay 5 -fsSL "${CRICTL_URL}" | tar -C "${ROOT_PATH}/usr/local/bin" -xz 2>/dev/null; then
+        CRICTL_DOWNLOADED=true
+        log_info "crictl installed successfully"
+        break
+    fi
+    log_info "crictl download attempt $i failed, retrying..."
+    sleep 5
+done
+
+if [ "$CRICTL_DOWNLOADED" = false ]; then
+    log_info "WARNING: crictl could not be downloaded after 5 attempts. Continuing anyway..."
+fi
 
 # Configure crictl
 cat > "${ROOT_PATH}/etc/crictl.yaml" <<EOF
@@ -318,13 +423,27 @@ sleep 3
 
 # Copy to output
 log_info "Copying image to output..."
-cp "${WORK_DIR}/base.img" "${OUTPUT_DIR}/k8s-${IMAGE_VERSION}.img"
+if ! cp "${WORK_DIR}/base.img" "${OUTPUT_DIR}/k8s-${IMAGE_VERSION}.img"; then
+    log_error "Failed to copy image to output directory"
+    exit 1
+fi
 sync
+
+# Verify output image
+if [[ ! -f "${OUTPUT_DIR}/k8s-${IMAGE_VERSION}.img" ]] || [[ ! -s "${OUTPUT_DIR}/k8s-${IMAGE_VERSION}.img" ]]; then
+    log_error "Output image is missing or empty"
+    exit 1
+fi
+
+log_info "Image copied successfully"
 
 # Generate checksums
 log_info "Generating checksums..."
 cd "${OUTPUT_DIR}"
-sha256sum "k8s-${IMAGE_VERSION}.img" > "k8s-${IMAGE_VERSION}.img.sha256"
+if ! sha256sum "k8s-${IMAGE_VERSION}.img" > "k8s-${IMAGE_VERSION}.img.sha256"; then
+    log_error "Failed to generate checksums"
+    exit 1
+fi
 
 # Generate metadata
 cat > "${OUTPUT_DIR}/metadata.json" <<EOF

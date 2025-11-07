@@ -74,9 +74,11 @@ open http://192.168.1.30/grafana/   # Grafana (admin/admin)
 - Welcome page (cluster dashboard)
 
 **Network Configuration**:
-- Private: 192.168.100.11 (cluster comms)
-- VIP: 192.168.1.30 (service access)
-- All services accessible via VIP
+- Private: 192.168.100.11 (cluster communications - assigned to node interface)
+- VIP: 192.168.1.30 (MetalLB virtual IP for external service access)
+- **Important**: The VIP (192.168.1.30) is the ONLY external IP on the 192.168.1.0 network
+- Node interfaces do NOT get individual 192.168.1.x IPs (e.g., no 192.168.1.21)
+- All services accessible via VIP only
 
 **Zero Manual Steps**:
 - No SSH configuration
