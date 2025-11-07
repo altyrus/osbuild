@@ -6,7 +6,27 @@ Flash → Boot → Wait 15-20 minutes → Production-ready cluster with all serv
 
 ## Quick Start
 
-### Build Node1 Image (x64 Test)
+### 1. Configure Environment
+
+First, create your `.env` configuration file:
+
+```bash
+cd /POOL01/software/projects/osbuild
+
+# Copy the sample configuration
+cp .env.sample .env
+
+# Edit to match your network
+nano .env  # Or use your preferred editor
+```
+
+**Key settings to verify**:
+- `PRIVATE_SUBNET` - Internal cluster network (default: 192.168.100.0/24)
+- `EXTERNAL_SUBNET` - External service network (default: 192.168.1.0/24)
+- `VIP` - MetalLB virtual IP for services (default: 192.168.1.30)
+- `NODE_COUNT` - Number of nodes (1 for single-node, 3 for HA)
+
+### 2. Build Node1 Image (x64 Test)
 
 ```bash
 cd /POOL01/software/projects/osbuild
@@ -17,7 +37,7 @@ sudo BUILD_PLATFORM=x64 ./build-zerotouch.sh --node1-only
 - `output-zerotouch-x64/k8s-node1.img` - Bootable image
 - `output-zerotouch-x64/credentials/` - SSH keys, passwords, cluster info
 
-### Boot and Test
+### 3. Boot and Test
 
 ```bash
 # Start VM
@@ -154,7 +174,23 @@ sudo dd if=output-zerotouch-pi5/k8s-node1.img \
 
 ## Configuration
 
-Edit `config/zerotouch-config.env` or set environment variables:
+The build system reads configuration from `.env` in the osbuild root directory.
+
+### Prerequisites
+
+1. **Create .env file**:
+   ```bash
+   cp .env.sample .env
+   ```
+
+2. **Edit configuration**:
+   ```bash
+   nano .env  # Edit to match your environment
+   ```
+
+### Configuration Variables
+
+Key settings in `.env`:
 
 ```bash
 # Network

@@ -2,24 +2,26 @@
 
 Automated OS image building and deployment system for x64 and Raspberry Pi 5 Kubernetes clusters with zero-touch provisioning.
 
-## ⚠️ Current Status
+## ✅ Current Status
 
-**Date:** 2025-11-06
-**Status:** Core functionality working, VIP networking issues under investigation
+**Date:** 2025-11-07
+**Status:** ✅ **FULLY OPERATIONAL** - All critical issues resolved!
 
 ### What Works
 ✅ Autonomous VM/baremetal boot
 ✅ Kubernetes cluster initialization
 ✅ All services deploy (Flannel, MetalLB, Ingress, Longhorn, MinIO, Prometheus, Grafana, Portainer)
 ✅ Internal cluster networking
+✅ **VIP accessibility (192.168.1.30) - MetalLB fully working!**
 ✅ SSH access and kubectl functionality
+✅ Zero-touch deployment ready for production
 
-### Known Issues
-❌ VIP (192.168.1.30) not accessible from external network
-❌ MetalLB L2 ARP announcements not working
-❌ Second IP not auto-applied on boot (requires manual configuration)
+### Recent Fixes (2025-11-07)
+✅ MetalLB VIP accessibility fixed (node label removal in bootstrap)
+✅ OSBuild now independent from platform project
+✅ Standalone `.env` configuration
 
-**See [SUCCESSFUL-FIX-REPORT.md](SUCCESSFUL-FIX-REPORT.md) for detailed status and [BUILD-COMPLETE.md](BUILD-COMPLETE.md) for deployment guide.**
+**See [SUCCESSFUL-FIX-REPORT.md](SUCCESSFUL-FIX-REPORT.md) for fix details and [ZERO-TOUCH-README.md](ZERO-TOUCH-README.md) for zero-touch deployment guide.**
 
 ---
 
@@ -141,6 +143,23 @@ osbuild/
 - Docker installed and running
 - 10GB+ free disk space
 - Linux/macOS host (Windows with WSL2 should work)
+- Configuration file (`.env`) set up for zero-touch deployment
+
+### Configuration (For Zero-Touch Deployment)
+
+If building zero-touch images, first configure your environment:
+
+```bash
+# Copy sample configuration
+cp .env.sample .env
+
+# Edit to match your network
+nano .env
+```
+
+Key settings: PRIVATE_SUBNET, EXTERNAL_SUBNET, VIP, NODE_COUNT
+
+See [ZERO-TOUCH-README.md](ZERO-TOUCH-README.md) for complete setup guide.
 
 ### Building an Image
 
