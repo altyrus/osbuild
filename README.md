@@ -316,7 +316,7 @@ nodes:
 
 ## Contributing
 
-See [claude.md](claude.md) for detailed planning and architecture discussions.
+See [CHANGELOG.md](CHANGELOG.md) for development history and session notes.
 
 ## License
 
