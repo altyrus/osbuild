@@ -125,17 +125,41 @@ fi
 
 log_info "Image conversion and resize completed successfully"
 
-# Setup loop device
+# Setup loop device with retry logic (same as Pi5 build)
 log_info "Setting up loop device..."
-LOOP_DEVICE=$(losetup -f --show "${WORK_DIR}/base.img")
 
-if [[ -z "${LOOP_DEVICE}" ]]; then
-    log_error "Failed to setup loop device"
-    exit 1
-fi
+# Retry loop device creation with exponential backoff
+RETRY_COUNT=0
+MAX_RETRIES=5
+LOOP_DEVICE=""
 
-if [[ ! -b "${LOOP_DEVICE}" ]]; then
-    log_error "Loop device ${LOOP_DEVICE} is not a block device"
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    LOOP_DEVICE=$(losetup -f --show "${WORK_DIR}/base.img" 2>&1) && break
+
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+    log_info "WARNING: Failed to create loop device (attempt $RETRY_COUNT/$MAX_RETRIES)"
+    log_info "Error: $LOOP_DEVICE"
+
+    if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+        SLEEP_TIME=$((2 ** RETRY_COUNT))
+        log_info "Retrying in ${SLEEP_TIME} seconds..."
+        sleep $SLEEP_TIME
+
+        # Clean up any stale loop devices
+        log_info "Cleaning up stale loop devices..."
+        losetup -D 2>/dev/null || true
+        sync
+    fi
+done
+
+if [[ -z "${LOOP_DEVICE}" ]] || [[ ! -b "${LOOP_DEVICE}" ]]; then
+    log_error "Failed to create loop device after $MAX_RETRIES attempts"
+    log_info "Checking loop devices:"
+    losetup -a || true
+    log_info "Checking base.img:"
+    ls -lh "${WORK_DIR}/base.img" || true
+    log_info "Checking /dev/loop*:"
+    ls -l /dev/loop* | head -20 || true
     exit 1
 fi
 
@@ -429,11 +453,46 @@ cleanup_chroot "${ROOT_PATH}"
 # Unmount
 safe_unmount "${ROOT_PATH}"
 
-# Detach loop device
+# Detach loop device with verification (same as Pi5 build)
 log_info "Detaching loop device..."
 sync
 sleep 2
-losetup -d "${LOOP_DEVICE}"
+
+# Initial detach attempt
+losetup -d "${LOOP_DEVICE}" 2>/dev/null || true
+sync
+sleep 2
+
+# Verify cleanup completed with retry loop
+log_info "Verifying loop device cleanup..."
+CLEANUP_RETRY=0
+CLEANUP_MAX_RETRIES=5
+LOOP_NAME=$(basename "${LOOP_DEVICE}")
+
+while [ $CLEANUP_RETRY -lt $CLEANUP_MAX_RETRIES ]; do
+    if losetup -a | grep -q "${LOOP_NAME}"; then
+        CLEANUP_RETRY=$((CLEANUP_RETRY + 1))
+        log_info "WARNING: Loop device ${LOOP_NAME} still in use (attempt $CLEANUP_RETRY/$CLEANUP_MAX_RETRIES)"
+
+        if [ $CLEANUP_RETRY -lt $CLEANUP_MAX_RETRIES ]; then
+            log_info "Forcing detach..."
+            losetup -d "${LOOP_DEVICE}" 2>/dev/null || true
+            sync
+            CLEANUP_SLEEP=$((2 * CLEANUP_RETRY))
+            log_info "Waiting ${CLEANUP_SLEEP} seconds..."
+            sleep $CLEANUP_SLEEP
+        else
+            log_error "Failed to detach loop device after $CLEANUP_MAX_RETRIES attempts"
+            log_info "Active loop devices:"
+            losetup -a || true
+            exit 1
+        fi
+    else
+        log_info "✅ Loop device ${LOOP_NAME} successfully detached"
+        break
+    fi
+done
+
 LOOP_DEVICE=""
 
 # Final sync
