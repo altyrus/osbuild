@@ -3,7 +3,7 @@
 
 set -e
 
-IMAGE="output-zerotouch-x64/k8s-node1.img"
+IMAGE="output/x64/zerotouch/k8s-node1.img"
 TAP_IFACE="tap-zt0"
 BRIDGE="virbr-k8s"
 MAC="52:54:00:12:34:56"

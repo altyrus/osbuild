@@ -1,4 +1,4 @@
-FROM ubuntu:22.04
+FROM debian:trixie
 
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
@@ -33,8 +33,8 @@ COPY scripts /workspace/scripts
 RUN chmod +x /workspace/scripts/*.sh && \
     chmod +x /workspace/image-build/scripts/*.sh
 
-# Create output directory
-RUN mkdir -p /workspace/output
+# Create directories for volume mounts
+RUN mkdir -p /workspace/output /workspace/cache /workspace/work
 
 # Set environment variables with defaults
 ENV K8S_VERSION=1.28.0

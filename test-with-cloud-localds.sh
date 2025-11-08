@@ -22,8 +22,8 @@ log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 NETWORK_NAME="k8s-network"  # Use existing network from platform
 VM_NAME="zt-node1-iso-test"
 NODE1_IP="192.168.100.11"
-BASE_IMAGE="$SCRIPT_DIR/output-zerotouch-x64/k8s-node1.img"
-SSH_KEY="$SCRIPT_DIR/output-zerotouch-x64/credentials/id_rsa"
+BASE_IMAGE="$SCRIPT_DIR/output/x64/zerotouch/k8s-node1.img"
+SSH_KEY="$SCRIPT_DIR/output/x64/zerotouch/credentials/id_rsa"
 SSH_PUB_KEY="${SSH_KEY}.pub"
 
 log_info "=========================================="

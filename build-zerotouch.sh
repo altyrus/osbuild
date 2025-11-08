@@ -77,6 +77,24 @@ echo "Step 1: Checking for base image..."
 if [ ! -f "$BASE_IMAGE" ]; then
     echo "Base image not found: $BASE_IMAGE"
     echo ""
+
+    # Check if a base build is already running
+    if [ "$BUILD_PLATFORM" = "x64" ] && [ -f "/tmp/osbuild-x64.lock" ]; then
+        LOCK_PID=$(cat /tmp/osbuild-x64.lock 2>/dev/null || echo "")
+        if [ -n "$LOCK_PID" ] && kill -0 "$LOCK_PID" 2>/dev/null; then
+            echo "ERROR: x64 base image build is already running (PID: $LOCK_PID)"
+            echo "Please wait for it to complete, then re-run this script."
+            exit 1
+        fi
+    elif [ "$BUILD_PLATFORM" = "pi5" ] && [ -f "/tmp/osbuild-pi5.lock" ]; then
+        LOCK_PID=$(cat /tmp/osbuild-pi5.lock 2>/dev/null || echo "")
+        if [ -n "$LOCK_PID" ] && kill -0 "$LOCK_PID" 2>/dev/null; then
+            echo "ERROR: Pi5 base image build is already running (PID: $LOCK_PID)"
+            echo "Please wait for it to complete, then re-run this script."
+            exit 1
+        fi
+    fi
+
     echo "Building base image with OSBuild..."
 
     if [ "$BUILD_PLATFORM" = "x64" ]; then
@@ -85,15 +103,15 @@ if [ ! -f "$BASE_IMAGE" ]; then
         ./build-x64.sh
 
         # Find the latest built image
-        LATEST_IMAGE=$(ls -t "$SCRIPT_DIR/output-x64"/k8s-x64-*.img 2>/dev/null | head -1)
+        LATEST_IMAGE=$(ls -t "$SCRIPT_DIR/output/x64"/k8s-x64-*.img 2>/dev/null | head -1)
         if [ -z "$LATEST_IMAGE" ]; then
             echo "ERROR: x64 image build failed - no output found"
             exit 1
         fi
 
         # Create symlink for easier reference
-        ln -sf "$(basename "$LATEST_IMAGE")" "$SCRIPT_DIR/output-x64/k8s-x64-latest.img"
-        BASE_IMAGE="$SCRIPT_DIR/output-x64/k8s-x64-latest.img"
+        ln -sf "$(basename "$LATEST_IMAGE")" "$SCRIPT_DIR/output/x64/k8s-x64-latest.img"
+        BASE_IMAGE="$SCRIPT_DIR/output/x64/k8s-x64-latest.img"
 
     elif [ "$BUILD_PLATFORM" = "pi5" ]; then
         echo "Running: $SCRIPT_DIR/build-pi5.sh"
@@ -101,15 +119,15 @@ if [ ! -f "$BASE_IMAGE" ]; then
         ./build-pi5.sh
 
         # Find the latest built image
-        LATEST_IMAGE=$(ls -t "$SCRIPT_DIR/output"/rpi5-k8s-*.img 2>/dev/null | head -1)
+        LATEST_IMAGE=$(ls -t "$SCRIPT_DIR/output/pi5"/rpi5-k8s-*.img 2>/dev/null | head -1)
         if [ -z "$LATEST_IMAGE" ]; then
             echo "ERROR: Pi5 image build failed - no output found"
             exit 1
         fi
 
         # Create symlink
-        ln -sf "$(basename "$LATEST_IMAGE")" "$SCRIPT_DIR/output/rpi5-k8s-latest.img"
-        BASE_IMAGE="$SCRIPT_DIR/output/rpi5-k8s-latest.img"
+        ln -sf "$(basename "$LATEST_IMAGE")" "$SCRIPT_DIR/output/pi5/rpi5-k8s-latest.img"
+        BASE_IMAGE="$SCRIPT_DIR/output/pi5/rpi5-k8s-latest.img"
     fi
 
     echo "Base image built: $BASE_IMAGE"

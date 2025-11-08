@@ -196,8 +196,8 @@ echo ""
 # List outputs
 if [[ "$BUILD_PLATFORM" == "x64" ]] || [[ "$BUILD_PLATFORM" == "all" ]]; then
     echo "x64 Outputs:"
-    if [ -d "$SCRIPT_DIR/output-zerotouch-x64" ]; then
-        ls -lh "$SCRIPT_DIR/output-zerotouch-x64"/*.img 2>/dev/null || echo "  No .img files found"
+    if [ -d "$SCRIPT_DIR/output/x64/zerotouch" ]; then
+        ls -lh "$SCRIPT_DIR/output/x64/zerotouch"/*.img 2>/dev/null || echo "  No .img files found"
     else
         echo "  Output directory not found"
     fi
@@ -206,8 +206,8 @@ fi
 
 if [[ "$BUILD_PLATFORM" == "pi5" ]] || [[ "$BUILD_PLATFORM" == "all" ]]; then
     echo "Pi5 Outputs:"
-    if [ -d "$SCRIPT_DIR/output-zerotouch-pi5" ]; then
-        ls -lh "$SCRIPT_DIR/output-zerotouch-pi5"/*.img 2>/dev/null || echo "  No .img files found"
+    if [ -d "$SCRIPT_DIR/output/pi5/zerotouch" ]; then
+        ls -lh "$SCRIPT_DIR/output/pi5/zerotouch"/*.img 2>/dev/null || echo "  No .img files found"
     else
         echo "  Output directory not found"
     fi
@@ -229,7 +229,7 @@ fi
 if [[ "$BUILD_PLATFORM" == "pi5" ]] || [[ "$BUILD_PLATFORM" == "all" ]]; then
     echo "Deploy Pi5 images:"
     echo "  Flash to SD card:"
-    echo "  sudo dd if=output-zerotouch-pi5/<image>.img of=/dev/sdX bs=4M status=progress conv=fsync"
+    echo "  sudo dd if=output/pi5/zerotouch/<image>.img of=/dev/sdX bs=4M status=progress conv=fsync"
     echo ""
 fi
 

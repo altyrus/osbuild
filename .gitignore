@@ -5,7 +5,11 @@ output/
 *.tar.gz
 *.sha256
 
-# Cache directories
+# Cache and work directories (new structure)
+cache/
+work/
+
+# Legacy directories (deprecated)
 image-build/cache/
 image-build/work/
 

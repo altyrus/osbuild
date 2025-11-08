@@ -11,6 +11,26 @@
 
 set -euo pipefail
 
+# Lock file to prevent concurrent builds
+LOCK_FILE="/tmp/osbuild-x64.lock"
+
+# Check for existing build
+if [ -f "${LOCK_FILE}" ]; then
+    LOCK_PID=$(cat "${LOCK_FILE}" 2>/dev/null || echo "")
+    if [ -n "${LOCK_PID}" ] && kill -0 "${LOCK_PID}" 2>/dev/null; then
+        echo "ERROR: Another x64 build is already running (PID: ${LOCK_PID})"
+        echo "If this is incorrect, remove the lock file: ${LOCK_FILE}"
+        exit 1
+    else
+        echo "Removing stale lock file..."
+        rm -f "${LOCK_FILE}"
+    fi
+fi
+
+# Create lock file
+echo $$ > "${LOCK_FILE}"
+trap "rm -f ${LOCK_FILE}" EXIT
+
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -24,9 +44,9 @@ source "${SCRIPT_DIR}/config/base-images.conf"
 ARCH="amd64"
 K8S_VERSION="${K8S_VERSION:-${DEFAULT_K8S_VERSION}}"
 IMAGE_VERSION="${IMAGE_VERSION:-x64-$(date +%Y%m%d-%H%M%S)}"
-OUTPUT_DIR="${OUTPUT_DIR:-${SCRIPT_DIR}/output-x64}"
-WORK_DIR="${SCRIPT_DIR}/image-build/work-x64"
-CACHE_DIR="${SCRIPT_DIR}/${BUILD_CACHE_DIR}"
+OUTPUT_DIR="${OUTPUT_DIR:-${SCRIPT_DIR}/output/x64}"
+WORK_DIR="${SCRIPT_DIR}/work/x64"
+CACHE_DIR="${SCRIPT_DIR}/cache/x64"
 
 # Use configuration values
 BASE_IMAGE_URL="${X64_BASE_IMAGE_URL}"

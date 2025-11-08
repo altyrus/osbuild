@@ -8,8 +8,8 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-IMAGE="$SCRIPT_DIR/output-zerotouch-x64/k8s-node1.img"
-CREDENTIALS="$SCRIPT_DIR/output-zerotouch-x64/credentials"
+IMAGE="$SCRIPT_DIR/output/x64/zerotouch/k8s-node1.img"
+CREDENTIALS="$SCRIPT_DIR/output/x64/zerotouch/credentials"
 
 if [ ! -f "$IMAGE" ]; then
     echo "ERROR: Image not found: $IMAGE"

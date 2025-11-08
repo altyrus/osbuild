@@ -20,14 +20,14 @@ Build Raspberry Pi 5 OS images using **only Docker** - no other dependencies nee
 
 ### Method 1: Simple Script (Recommended)
 
-**No docker-compose needed, just Docker:**
+**Just Docker required:**
 
 ```bash
 # Clone the repo
 git clone https://github.com/altyrus/osbuild.git
 cd osbuild
 
-# Build with defaults (output to ./output, K8s 1.28.0)
+# Build with defaults (output to ./output/pi5, K8s 1.28.0)
 ./build-pi5.sh
 
 # Custom output directory
@@ -39,22 +39,7 @@ cd osbuild
 
 **That's it!** Image will be in your output directory in 15-30 minutes.
 
-### Method 2: docker-compose
-
-**If you have docker-compose:**
-
-```bash
-git clone https://github.com/altyrus/osbuild.git
-cd osbuild
-
-# Build with defaults
-./build-pi5.sh
-
-# Custom settings
-OUTPUT_DIR=/path/to/output K8S_VERSION=1.29.0 ./build-pi5.sh
-```
-
-### Method 3: Pure Docker Commands
+### Method 2: Pure Docker Commands
 
 **For complete control:**
 
@@ -62,12 +47,17 @@ OUTPUT_DIR=/path/to/output K8S_VERSION=1.29.0 ./build-pi5.sh
 # Build the image
 docker build -t osbuild:latest .
 
-# Run the build
+# Run the build (manual approach, not recommended - use build-pi5.sh instead)
 docker run --rm --privileged \
-    -v $(pwd)/output:/workspace/output \
-    -v $(pwd)/image-build/cache:/workspace/image-build/cache \
+    -v $(pwd)/output/pi5:/workspace/output \
+    -v $(pwd)/cache/pi5:/workspace/cache \
+    -v $(pwd)/work/pi5:/workspace/work \
     -e K8S_VERSION=1.28.0 \
+    -e SKIP_IMAGE_RESIZE=true \
     osbuild:latest
+
+# Note: This requires pre-processing the image outside Docker first
+# It's better to use ./build-pi5.sh which handles everything
 ```
 
 ## What Gets Built
@@ -133,10 +123,10 @@ All scripts support these environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `OUTPUT_DIR` | `./output` | Where to save built images |
+| `OUTPUT_DIR` | `./output/pi5` | Where to save built images |
 | `K8S_VERSION` | `1.28.0` | Kubernetes version to install |
 | `IMAGE_VERSION` | `docker-TIMESTAMP` | Custom version identifier |
-| `CACHE_DIR` | `./image-build/cache` | Cache for base images |
+| `CACHE_DIR` | `./cache/pi5` | Cache for base images |
 
 Example:
 ```bash
@@ -364,12 +354,9 @@ Docker Desktop → Settings → Resources:
 
 ### Keep Cache
 
-Don't delete `./image-build/cache/` between builds - it contains the 500MB base image.
+Don't delete `./cache/pi5/` between builds - it contains the 500MB base image.
 
 ## FAQ
-
-**Q: Do I need docker-compose?**
-A: No, use `build-pi5.sh` for pure Docker.
 
 **Q: Can I run this in CI/CD?**
 A: Yes, any CI/CD with Docker support works.

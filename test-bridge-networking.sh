@@ -7,7 +7,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-IMAGE="$SCRIPT_DIR/output-zerotouch-x64/k8s-node1.img"
+IMAGE="$SCRIPT_DIR/output/x64/zerotouch/k8s-node1.img"
 TAP_IFACE="tap-fresh-test"
 BRIDGE="virbr-k8s"
 MAC="52:54:00:12:34:58"

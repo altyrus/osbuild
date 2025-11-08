@@ -23,11 +23,11 @@ source "$SCRIPT_DIR/lib/image-utils.sh"
 ################################################################################
 
 VM_NAME="k8s-node1"
-IMAGE_PATH="$SCRIPT_DIR/output-zerotouch-x64/k8s-node1.img"
+IMAGE_PATH="$SCRIPT_DIR/output/x64/zerotouch/k8s-node1.img"
 NETWORK_NAME="k8s-network"
 NODE_IP="${PRIVATE_IP_START}"  # Node 1 gets the starting IP
 VIP_ADDRESS="$VIP"
-SSH_KEY="$SCRIPT_DIR/output-zerotouch-x64/credentials/id_rsa"
+SSH_KEY="$SCRIPT_DIR/output/x64/zerotouch/credentials/id_rsa"
 SSH_USER="${SSH_USER:-k8sadmin}"  # Default to k8sadmin if not set
 
 # Monitoring timeouts (in seconds)

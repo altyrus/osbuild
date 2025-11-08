@@ -34,41 +34,100 @@ fi
 echo "✅ QEMU ARM64 emulation enabled"
 
 # Step 1: Download base image if not cached
-if [[ ! -f "image-build/cache/${RASPIOS_VERSION}.img.xz" ]]; then
+if [[ ! -f "cache/${RASPIOS_VERSION}.img.xz" ]]; then
     echo ""
     echo "==> Downloading Raspberry Pi OS base image..."
-    mkdir -p image-build/cache
-    cd image-build/cache
-    wget -q --show-progress \
-        "https://downloads.raspberrypi.com/raspios_lite_arm64/images/raspios_lite_arm64-2025-10-02/${RASPIOS_VERSION}.img.xz"
+    mkdir -p cache
+    cd cache
+    if ! wget -q --show-progress \
+        "https://downloads.raspberrypi.com/raspios_lite_arm64/images/raspios_lite_arm64-2025-10-02/${RASPIOS_VERSION}.img.xz"; then
+        echo "ERROR: Failed to download base image"
+        exit 1
+    fi
+
+    # Verify download
+    if [ ! -s "${RASPIOS_VERSION}.img.xz" ]; then
+        echo "ERROR: Downloaded file is empty"
+        rm -f "${RASPIOS_VERSION}.img.xz"
+        exit 1
+    fi
+
     cd /workspace
     echo "✅ Download complete"
 else
     echo "==> Using cached base image"
 fi
 
-# Step 2: Extract base image
-echo ""
-echo "==> Extracting base image..."
-mkdir -p image-build/work
-xz -dc "image-build/cache/${RASPIOS_VERSION}.img.xz" > image-build/work/base.img
-ls -lh image-build/work/base.img
+# Step 2: Extract or use pre-processed base image
+if [ "${SKIP_IMAGE_RESIZE}" = "true" ]; then
+    echo ""
+    echo "==> Using pre-processed base image (resize done outside Docker)..."
+    cd work
 
-# Step 3: Expand image
-echo ""
-echo "==> Expanding image for customization..."
-cd image-build/work
+    # Verify base.img exists
+    if [ ! -f "base.img" ]; then
+        echo "=========================================="
+        echo "ERROR: Pre-processed base.img not found"
+        echo "=========================================="
+        echo ""
+        echo "The build was started with SKIP_IMAGE_RESIZE=true, which expects"
+        echo "the base image to be pre-processed (downloaded, extracted, and"
+        echo "resized) OUTSIDE of Docker before running the container."
+        echo ""
+        echo "The pre-processing should have created: /workspace/work/base.img"
+        echo ""
+        echo "This is done by the build-pi5.sh script in the pre-processing stage."
+        echo "The build-pi5.sh script may have failed or is still running."
+        echo ""
+        echo "Current work directory contents:"
+        ls -la
+        echo ""
+        echo "Please check that build-pi5.sh completed successfully."
+        echo "=========================================="
+        exit 1
+    fi
 
-# Verify base.img exists
-if [ ! -f "base.img" ]; then
-    echo "ERROR: base.img not found"
-    ls -la
-    exit 1
+    # Verify base.img is not empty
+    if [ ! -s "base.img" ]; then
+        echo "ERROR: base.img exists but is empty"
+        exit 1
+    fi
+
+    ls -lh base.img
+else
+    echo ""
+    echo "==> Extracting base image..."
+    mkdir -p work
+    if ! xz -dc "cache/${RASPIOS_VERSION}.img.xz" > work/base.img; then
+        echo "ERROR: Failed to extract base image"
+        rm -f work/base.img
+        exit 1
+    fi
+
+    # Verify extraction
+    if [ ! -s "work/base.img" ]; then
+        echo "ERROR: Extracted image is empty or missing"
+        exit 1
+    fi
+
+    ls -lh work/base.img
+
+    # Step 3: Create target-sized image (no filesystem resize - manual expansion later)
+    echo ""
+    echo "==> Creating 120GB target image (filesystem expansion deferred)..."
+    cd work
+
+    # Verify base.img exists
+    if [ ! -f "base.img" ]; then
+        echo "ERROR: base.img not found"
+        ls -la
+        exit 1
+    fi
+
+    truncate -s 120G base.img
+    echo ", +" | sfdisk -N 2 base.img
+    sync  # Ensure partition table is written
 fi
-
-truncate -s +2G base.img
-echo ", +" | sfdisk -N 2 base.img
-sync  # Ensure partition table is written
 
 # Setup loop device
 LOOP_DEVICE=$(losetup -f --show base.img || {
@@ -113,9 +172,14 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Resize filesystem
-e2fsck -f -y ${ROOT_DEV} || true
-resize2fs ${ROOT_DEV}
+# Filesystem resize status
+if [ "${SKIP_IMAGE_RESIZE}" = "true" ]; then
+    echo "✅ Filesystem pre-resized to 120GB (done outside Docker)"
+    echo "   Image ready to use - no manual expansion needed"
+else
+    echo "⚠ Filesystem resize skipped - partition expanded but filesystem at original size"
+    echo "  You can expand manually with: sudo resize2fs /dev/sdX2"
+fi
 
 cd /workspace
 
@@ -192,7 +256,7 @@ sleep 2
 
 # Copy disk image
 echo "Copying image file..."
-cp image-build/work/base.img output/rpi5-k8s-${IMAGE_VERSION}.img
+cp work/base.img output/rpi5-k8s-${IMAGE_VERSION}.img
 
 # Ensure copied file is synced
 sync

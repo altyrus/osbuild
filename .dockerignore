@@ -2,11 +2,15 @@
 .git
 .github
 
-# Build artifacts and cache
-image-build/cache
-image-build/work
+# Build artifacts and cache (new structure)
+cache
+work
 output
 test-output
+
+# Legacy directories (deprecated)
+image-build/cache
+image-build/work
 
 # Documentation and notes
 docs

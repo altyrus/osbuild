@@ -28,8 +28,8 @@ NODE1_IP="192.168.100.11"
 
 # VM configuration
 VM_NAME="k8s-zerotouch-node1"
-IMAGE_PATH="$SCRIPT_DIR/output-zerotouch-x64/k8s-node1.img"
-SSH_KEY="$SCRIPT_DIR/output-zerotouch-x64/credentials/id_rsa"
+IMAGE_PATH="$SCRIPT_DIR/output/x64/zerotouch/k8s-node1.img"
+SSH_KEY="$SCRIPT_DIR/output/x64/zerotouch/credentials/id_rsa"
 
 log_info "=========================================="
 log_info "Zero-Touch Node1 Test with Libvirt"

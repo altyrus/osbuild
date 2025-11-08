@@ -243,31 +243,6 @@ docker run --privileged -v $(pwd)/output:/workspace/output osbuild-builder \
   /workspace/scripts/build-local.sh
 ```
 
-### Or Use docker-compose
-
-```yaml
-# docker-compose.yml
-version: '3.8'
-
-services:
-  builder:
-    build:
-      context: .
-      dockerfile: Dockerfile.builder
-    privileged: true
-    volumes:
-      - ./output:/workspace/output
-      - ./image-build/cache:/workspace/image-build/cache
-    environment:
-      - K8S_VERSION=1.28.0
-    command: /workspace/scripts/build-local.sh
-```
-
-Run with:
-```bash
-docker-compose up
-```
-
 ## Option 4: Native Local Build (Current)
 
 **Best for**: Simple, no Docker overhead, full control

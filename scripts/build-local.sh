@@ -52,16 +52,16 @@ echo "Checking dependencies..."
 check_dependencies
 
 # Create directories
-mkdir -p "$PROJECT_ROOT/image-build/cache"
-mkdir -p "$PROJECT_ROOT/image-build/work"
-mkdir -p "$PROJECT_ROOT/output/netboot"
+mkdir -p "$PROJECT_ROOT/cache/pi5"
+mkdir -p "$PROJECT_ROOT/work/pi5"
+mkdir -p "$PROJECT_ROOT/output/pi5"
 
 cd "$PROJECT_ROOT"
 
 # Download base image if not cached
-if [[ ! -f "image-build/cache/${RASPIOS_VERSION}.img.xz" ]]; then
+if [[ ! -f "cache/pi5/${RASPIOS_VERSION}.img.xz" ]]; then
     echo "Downloading Raspberry Pi OS base image..."
-    wget -P image-build/cache \
+    wget -P cache/pi5 \
         "https://downloads.raspberrypi.com/raspios_lite_arm64/images/raspios_lite_arm64-2024-07-04/${RASPIOS_VERSION}.img.xz"
 else
     echo "Using cached base image"
@@ -69,19 +69,19 @@ fi
 
 # Extract base image
 echo "Extracting base image..."
-xz -dc "image-build/cache/${RASPIOS_VERSION}.img.xz" > "image-build/work/base.img"
+xz -dc "cache/pi5/${RASPIOS_VERSION}.img.xz" > "work/pi5/base.img"
 
 # Expand image
 echo "Expanding image for customization..."
-truncate -s +2G "image-build/work/base.img"
+truncate -s +2G "work/pi5/base.img"
 
 # Expand partition
 echo "Expanding partition..."
-echo ", +" | sudo sfdisk -N 2 "image-build/work/base.img"
+echo ", +" | sudo sfdisk -N 2 "work/pi5/base.img"
 
 # Setup loop device
 echo "Setting up loop device..."
-LOOP_DEVICE=$(sudo losetup -fP --show "image-build/work/base.img")
+LOOP_DEVICE=$(sudo losetup -fP --show "work/pi5/base.img")
 echo "Loop device: $LOOP_DEVICE"
 
 cleanup() {
@@ -138,7 +138,7 @@ sudo umount /tmp/root
 # Shrink image
 echo ""
 echo "Shrinking image..."
-sudo "$PROJECT_ROOT/scripts/shrink-image.sh" "image-build/work/base.img"
+sudo "$PROJECT_ROOT/scripts/shrink-image.sh" "work/pi5/base.img"
 
 # Cleanup loop device
 sudo losetup -d "$LOOP_DEVICE"
@@ -147,7 +147,7 @@ trap - EXIT
 # Create output artifacts
 echo ""
 echo "Creating output artifacts..."
-cp "image-build/work/base.img" "output/rpi5-k8s-${IMAGE_VERSION}.img"
+cp "work/pi5/base.img" "output/pi5/rpi5-k8s-${IMAGE_VERSION}.img"
 
 # Extract rootfs
 echo "Extracting rootfs..."
