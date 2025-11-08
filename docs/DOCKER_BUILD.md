@@ -255,7 +255,7 @@ First build downloads 500MB Raspberry Pi OS image. It's cached for subsequent bu
 
 Speed up:
 - Use wired internet
-- Download manually and place in `./image-build/cache/`
+- Download manually and place in `./cache/pi5/`
 - Wait it out (only happens once)
 
 ### "Build fails at mount step"

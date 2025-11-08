@@ -25,7 +25,7 @@ scoop install act
 
 ```bash
 # Run the workflow locally
-cd /POOL01/software/projects/osbuild
+cd osbuild
 act
 
 # Run specific workflow

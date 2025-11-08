@@ -81,17 +81,18 @@ sudo apt-get install -y \
 ### Build x64 Image
 
 ```bash
-cd /POOL01/software/projects/osbuild
+git clone https://github.com/altyrus/osbuild.git
+cd osbuild
 sudo ./build-x64.sh
 ```
 
 **Build time**: ~5-10 minutes (depending on network speed)
-**Output**: `output-x64/k8s-x64-<timestamp>.img`
+**Output**: `output/x64/k8s-x64-<timestamp>.img`
 
 ### Build Pi5 Image
 
 ```bash
-cd /POOL01/software/projects/osbuild
+cd osbuild
 ./build-pi5.sh
 ```
 
@@ -113,11 +114,14 @@ osbuild/
 ├── scripts/
 │   ├── docker-entrypoint.sh    # Pi5 Docker build logic
 │   └── ...                      # Helper scripts
-├── image-build/
-│   ├── cache/                   # Downloaded base images
-│   └── work-x64/                # x64 build workspace
-├── output-x64/                  # x64 built images
-└── output/                      # Pi5 built images
+├── cache/
+│   ├── x64/                     # Downloaded x64 base images
+│   └── pi5/                     # Downloaded Pi5 base images
+├── work/
+│   └── x64/                     # x64 build workspace
+├── output/
+│   ├── x64/                     # x64 built images
+│   └── pi5/                     # Pi5 built images
 ```
 
 ### Shared Components
@@ -203,7 +207,7 @@ Both platforms include embedded cloud-init configuration:
 ```bash
 # Boot image with SSH forwarding to port 2222
 sudo qemu-system-x86_64 -enable-kvm -m 2048 -smp 2 -nographic \
-  -drive file=output-x64/k8s-x64-<timestamp>.img,format=raw,if=virtio \
+  -drive file=output/x64/k8s-x64-<timestamp>.img,format=raw,if=virtio \
   -netdev user,id=net0,hostfwd=tcp::2222-:22 \
   -device virtio-net-pci,netdev=net0
 ```
@@ -325,7 +329,7 @@ bash -x ./build-x64.sh 2>&1 | tee build-debug.log
 Check specific sections:
 ```bash
 # Check downloaded base image
-ls -lh image-build/cache/
+ls -lh cache/x64/
 
 # Check loop device setup
 sudo losetup -a
@@ -381,10 +385,10 @@ These images are designed to work seamlessly with the [Platform Project](../plat
 
 1. **For libvirt/KVM deployment** (x64):
    ```bash
-   cd /POOL01/software/projects/platform
+   cd ../platform
 
    # Copy OSBuild image to platform VMs directory
-   cp /POOL01/software/projects/osbuild/output-x64/k8s-x64-*.img vms/base-image.img
+   cp ../osbuild/output/x64/k8s-x64-*.img vms/base-image.img
 
    # Platform scripts will:
    # - Clone base image for each node
@@ -395,7 +399,7 @@ These images are designed to work seamlessly with the [Platform Project](../plat
 2. **For Pi5 hardware deployment**:
    ```bash
    # Flash OSBuild image to SD cards
-   sudo dd if=/POOL01/software/projects/osbuild/output/rpi5-k8s-*.img \
+   sudo dd if=./output/pi5/rpi5-k8s-*.img \
            of=/dev/sdX bs=4M status=progress
 
    # Platform can then:
@@ -434,7 +438,7 @@ ALLOW_PASSWORD="yes"               # OSBuild enables SSH password auth
 ### x64 Build Flow
 
 ```
-1. Download Debian cloud image (qcow2) → image-build/cache/
+1. Download Debian cloud image (qcow2) → cache/x64/
 2. Convert qcow2 to raw format
 3. Expand image to 5GB
 4. Setup loop device and partition
@@ -462,7 +466,7 @@ ALLOW_PASSWORD="yes"               # OSBuild enables SSH password auth
 ```
 1. Setup Docker environment
 2. Enable QEMU ARM64 emulation
-3. Download Raspberry Pi OS image (img.xz) → image-build/cache/
+3. Download Raspberry Pi OS image (img.xz) → cache/pi5/
 4. Extract xz archive to img
 5. Expand image (+2GB)
 6. Setup loop device
@@ -584,7 +588,7 @@ Consider additional hardening for production:
 When new Debian or Raspberry Pi OS releases are available:
 
 1. Update `config/base-images.conf` with new URLs
-2. Clear cache: `rm -rf image-build/cache/*`
+2. Clear cache: `rm -rf cache/x64/*` or `rm -rf cache/pi5/*`
 3. Rebuild images
 4. Test thoroughly before deployment
 

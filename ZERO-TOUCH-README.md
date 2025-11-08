@@ -11,7 +11,9 @@ Flash → Boot → Wait 15-20 minutes → Production-ready cluster with all serv
 First, create your `.env` configuration file:
 
 ```bash
-cd /POOL01/software/projects/osbuild
+# Clone the repository (if you haven't already)
+git clone https://github.com/altyrus/osbuild.git
+cd osbuild
 
 # Copy the sample configuration
 cp .env.sample .env
@@ -29,13 +31,13 @@ nano .env  # Or use your preferred editor
 ### 2. Build Node1 Image (x64 Test)
 
 ```bash
-cd /POOL01/software/projects/osbuild
+cd osbuild
 sudo BUILD_PLATFORM=x64 ./build-zerotouch.sh --node1-only
 ```
 
 **Output**:
-- `output-zerotouch-x64/k8s-node1.img` - Bootable image
-- `output-zerotouch-x64/credentials/` - SSH keys, passwords, cluster info
+- `output/x64/zerotouch/k8s-node1.img` - Bootable image
+- `output/x64/zerotouch/credentials/` - SSH keys, passwords, cluster info
 
 ### 3. Boot and Test
 
@@ -45,13 +47,13 @@ sudo qemu-system-x86_64 \
   -enable-kvm \
   -m 16384 \
   -smp 4 \
-  -drive file=output-zerotouch-x64/k8s-node1.img,format=raw,if=virtio \
+  -drive file=output/x64/zerotouch/k8s-node1.img,format=raw,if=virtio \
   -netdev bridge,id=net0,br=virbr0 \
   -device virtio-net-pci,netdev=net0 \
   -serial mon:stdio
 
 # Monitor bootstrap (after ~1 min)
-ssh -i output-zerotouch-x64/credentials/id_rsa k8sadmin@192.168.100.11 \
+ssh -i output/x64/zerotouch/credentials/id_rsa k8sadmin@192.168.100.11 \
   tail -f /var/log/bootstrap.log
 
 # Access services (after ~18 min)
@@ -167,7 +169,7 @@ sudo BUILD_PLATFORM=pi5 ./build-zerotouch.sh
 
 **Flash to SD card**:
 ```bash
-sudo dd if=output-zerotouch-pi5/k8s-node1.img \
+sudo dd if=output/pi5/zerotouch/k8s-node1.img \
   of=/dev/sdX \
   bs=4M \
   status=progress \
@@ -220,7 +222,7 @@ export NODE_COUNT=3  # Or 1 for testing
 sudo apt-get install qemu-system-x86-64 qemu-utils losetup parted e2fsprogs
 
 # Check base image exists
-ls -lh output-x64/k8s-x64-latest.img
+ls -lh output/x64/k8s-x64-latest.img
 ```
 
 ### Bootstrap Fails
@@ -308,7 +310,7 @@ osbuild/
 │       └── bootstrap-common.sh  # Shared functions
 ├── cloud-init/
 │   └── *.yaml.tmpl              # Cloud-init templates
-└── output-zerotouch-{platform}/
+└── output/{platform}/zerotouch/
     ├── k8s-node*.img            # Bootable images
     └── credentials/             # Access info
 ```

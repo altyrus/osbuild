@@ -26,9 +26,10 @@ cd e2fsprogs-1.47.1
 ./configure
 make -j$(nproc)
 
-# Copy binaries to osbuild tools directory
-mkdir -p /path/to/osbuild/tools/e2fsprogs-1.47.1/bin
-cp e2fsck/e2fsck resize/resize2fs misc/tune2fs /path/to/osbuild/tools/e2fsprogs-1.47.1/bin/
+# Copy binaries to osbuild tools directory (from the osbuild project root)
+# Adjust the path if your osbuild directory is elsewhere
+mkdir -p ~/osbuild/tools/e2fsprogs-1.47.1/bin
+cp e2fsck/e2fsck resize/resize2fs misc/tune2fs ~/osbuild/tools/e2fsprogs-1.47.1/bin/
 ```
 
 ### Binaries Included
