@@ -62,21 +62,31 @@ if ! docker info >/dev/null 2>&1; then
     exit 1
 fi
 
+# Register QEMU ARM64 binfmt handler on host (needed for chroot in Docker)
+echo "Registering QEMU ARM64 binfmt handler..."
+if [ ! -f /proc/sys/fs/binfmt_misc/qemu-aarch64 ]; then
+    docker run --rm --privileged multiarch/qemu-user-static --reset -p yes >/dev/null 2>&1 || {
+        echo "WARNING: Could not register QEMU handlers, ARM64 emulation may not work"
+    }
+    echo "QEMU ARM64 handler registered"
+else
+    echo "QEMU ARM64 handler already registered"
+fi
+
 # Build image
 echo "Building Docker image..."
 docker build -t osbuild:latest "${PROJECT_DIR}"
 
 echo ""
-echo "Pre-processing base image (resize outside Docker)..."
+echo "Downloading base image (all processing done in Docker)..."
 echo ""
 
-# Download and extract base image if needed
+# Download base image if needed (Docker will handle extraction and resize)
 WORK_DIR="${PROJECT_DIR}/work/pi5"
 mkdir -p "${WORK_DIR}"
 
 RASPIOS_VERSION="2025-10-01-raspios-trixie-arm64-lite"
 BASE_IMAGE_XZ="${CACHE_DIR}/${RASPIOS_VERSION}.img.xz"
-BASE_IMAGE="${WORK_DIR}/base.img"
 
 if [ ! -f "${BASE_IMAGE_XZ}" ]; then
     echo "Downloading base image..."
@@ -99,92 +109,9 @@ else
     echo "Using cached base image: ${BASE_IMAGE_XZ}"
 fi
 
-echo "Extracting base image..."
-if ! xz -dc "${BASE_IMAGE_XZ}" > "${BASE_IMAGE}"; then
-    echo "ERROR: Failed to extract base image"
-    rm -f "${BASE_IMAGE}"
-    exit 1
-fi
-
-# Verify extracted image
-if [ ! -s "${BASE_IMAGE}" ]; then
-    echo "ERROR: Extracted image is empty or missing"
-    exit 1
-fi
-
-echo "Original image size:"
-ls -lh "${BASE_IMAGE}"
-
 echo ""
-echo "Resizing image to 120GB..."
-qemu-img resize "${BASE_IMAGE}" 120G
-
-echo "Resized image:"
-ls -lh "${BASE_IMAGE}"
-
-echo ""
-echo "Setting up loop device..."
-LOOP_DEVICE=$(losetup -f --show "${BASE_IMAGE}")
-echo "Loop device: ${LOOP_DEVICE}"
-
-echo ""
-echo "Resizing partition..."
-# Get partition 2 info
-PART_START=$(parted ${LOOP_DEVICE} unit s print | grep "^ 2" | awk '{print $2}' | sed 's/s//')
-echo "Partition 2 starts at sector: ${PART_START}"
-
-# Resize partition 2 to use all available space
-parted ${LOOP_DEVICE} ---pretend-input-tty <<EOF
-resizepart
-2
-100%
-Yes
-EOF
-
-echo ""
-echo "Updating kernel partition table..."
-partprobe ${LOOP_DEVICE}
-sleep 2
-
-echo ""
-echo "Checking and resizing filesystem..."
-# Use kpartx to create device mappings
-kpartx -av ${LOOP_DEVICE}
-sleep 2
-
-# Get partition device name (kpartx creates /dev/mapper/ devices)
-LOOP_NAME=$(basename ${LOOP_DEVICE})
-PART_DEVICE="/dev/mapper/${LOOP_NAME}p2"
-
-if [ ! -b "${PART_DEVICE}" ]; then
-    echo "ERROR: Partition device ${PART_DEVICE} not found"
-    echo "Available devices:"
-    ls -la /dev/mapper/
-    kpartx -dv ${LOOP_DEVICE}
-    losetup -d ${LOOP_DEVICE}
-    exit 1
-fi
-
-echo "Partition device: ${PART_DEVICE}"
-
-echo ""
-echo "Running e2fsck..."
-e2fsck -f -y ${PART_DEVICE} || {
-    echo "WARNING: e2fsck reported errors, but continuing..."
-}
-
-echo ""
-echo "Running resize2fs to full 120GB..."
-resize2fs ${PART_DEVICE}
-
-echo ""
-echo "Filesystem resized. Cleaning up..."
-kpartx -dv ${LOOP_DEVICE}
-losetup -d ${LOOP_DEVICE}
-echo "Cleanup complete."
-
-echo ""
-echo "Pre-processing complete. Starting Docker build..."
+echo "Base image ready. Starting Docker build..."
+echo "Docker will handle extraction, resize, and filesystem expansion."
 echo ""
 
 # Run build with volume mounts
@@ -194,7 +121,6 @@ docker run --rm --privileged \
     -v "${WORK_DIR}:/workspace/work" \
     -e K8S_VERSION="${K8S_VERSION}" \
     -e IMAGE_VERSION="${IMAGE_VERSION}" \
-    -e SKIP_IMAGE_RESIZE=true \
     osbuild:latest
 
 # Check result

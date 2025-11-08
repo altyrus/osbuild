@@ -151,7 +151,7 @@ mkdir -p "${ROOT_PATH}/etc/apt/keyrings"
 
 # Download Kubernetes signing key
 curl -fsSL "https://pkgs.k8s.io/core:/stable:/v${K8S_VERSION%.*}/deb/Release.key" | \
-    gpg --dearmor -o "${ROOT_PATH}/etc/apt/keyrings/kubernetes-apt-keyring.gpg"
+    /usr/bin/gpg --dearmor -o "${ROOT_PATH}/etc/apt/keyrings/kubernetes-apt-keyring.gpg"
 
 # Add Kubernetes repository
 echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v${K8S_VERSION%.*}/deb/ /" | \

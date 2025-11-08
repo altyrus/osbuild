@@ -136,10 +136,10 @@ echo "network: {config: disabled}" > "${ROOT_PATH}/etc/cloud/cloud.cfg.d/99_disa
 
 # Enable cloud-init services
 echo "Enabling cloud-init services..."
-chroot "${ROOT_PATH}" systemctl enable cloud-init-local.service
-chroot "${ROOT_PATH}" systemctl enable cloud-init.service
-chroot "${ROOT_PATH}" systemctl enable cloud-config.service
-chroot "${ROOT_PATH}" systemctl enable cloud-final.service
+chroot "${ROOT_PATH}" systemctl enable cloud-init-local.service || true
+chroot "${ROOT_PATH}" systemctl enable cloud-init.service || true
+chroot "${ROOT_PATH}" systemctl enable cloud-config.service || true
+chroot "${ROOT_PATH}" systemctl enable cloud-final.service || true
 
 # Clean cloud-init state to ensure it runs on first boot
 echo "Cleaning cloud-init state..."

@@ -58,86 +58,168 @@ else
     echo "==> Using cached base image"
 fi
 
-# Step 2: Extract or use pre-processed base image
-if [ "${SKIP_IMAGE_RESIZE}" = "true" ]; then
-    echo ""
-    echo "==> Using pre-processed base image (resize done outside Docker)..."
-    cd work
-
-    # Verify base.img exists
-    if [ ! -f "base.img" ]; then
-        echo "=========================================="
-        echo "ERROR: Pre-processed base.img not found"
-        echo "=========================================="
-        echo ""
-        echo "The build was started with SKIP_IMAGE_RESIZE=true, which expects"
-        echo "the base image to be pre-processed (downloaded, extracted, and"
-        echo "resized) OUTSIDE of Docker before running the container."
-        echo ""
-        echo "The pre-processing should have created: /workspace/work/base.img"
-        echo ""
-        echo "This is done by the build-pi5.sh script in the pre-processing stage."
-        echo "The build-pi5.sh script may have failed or is still running."
-        echo ""
-        echo "Current work directory contents:"
-        ls -la
-        echo ""
-        echo "Please check that build-pi5.sh completed successfully."
-        echo "=========================================="
-        exit 1
-    fi
-
-    # Verify base.img is not empty
-    if [ ! -s "base.img" ]; then
-        echo "ERROR: base.img exists but is empty"
-        exit 1
-    fi
-
-    ls -lh base.img
-else
-    echo ""
-    echo "==> Extracting base image..."
-    mkdir -p work
-    if ! xz -dc "cache/${RASPIOS_VERSION}.img.xz" > work/base.img; then
-        echo "ERROR: Failed to extract base image"
-        rm -f work/base.img
-        exit 1
-    fi
-
-    # Verify extraction
-    if [ ! -s "work/base.img" ]; then
-        echo "ERROR: Extracted image is empty or missing"
-        exit 1
-    fi
-
-    ls -lh work/base.img
-
-    # Step 3: Create target-sized image (no filesystem resize - manual expansion later)
-    echo ""
-    echo "==> Creating 120GB target image (filesystem expansion deferred)..."
-    cd work
-
-    # Verify base.img exists
-    if [ ! -f "base.img" ]; then
-        echo "ERROR: base.img not found"
-        ls -la
-        exit 1
-    fi
-
-    truncate -s 120G base.img
-    echo ", +" | sfdisk -N 2 base.img
-    sync  # Ensure partition table is written
+# Step 2: Extract and resize base image
+echo ""
+echo "==> Extracting base image..."
+mkdir -p work
+if ! xz -dc "cache/${RASPIOS_VERSION}.img.xz" > work/base.img; then
+    echo "ERROR: Failed to extract base image"
+    rm -f work/base.img
+    exit 1
 fi
 
-# Setup loop device
-LOOP_DEVICE=$(losetup -f --show base.img || {
-    echo "ERROR: Failed to create loop device"
+# Verify extraction
+if [ ! -s "work/base.img" ]; then
+    echo "ERROR: Extracted image is empty or missing"
+    exit 1
+fi
+
+echo "Original image size:"
+ls -lh work/base.img
+
+# Step 3: Resize image to 120GB
+echo ""
+echo "==> Resizing image to 120GB..."
+cd work
+qemu-img resize base.img 120G
+
+echo "Resized image:"
+ls -lh base.img
+
+# Step 4: Setup loop device and expand partition
+echo ""
+echo "==> Setting up loop device..."
+RESIZE_LOOP=$(losetup -f --show base.img)
+echo "Loop device: ${RESIZE_LOOP}"
+
+echo ""
+echo "==> Resizing partition 2 to use all space..."
+parted ${RESIZE_LOOP} ---pretend-input-tty <<EOF
+resizepart
+2
+100%
+Yes
+EOF
+
+echo "Updating partition table..."
+partprobe ${RESIZE_LOOP}
+sleep 2
+
+# Step 5: Expand filesystem using kpartx
+echo ""
+echo "==> Expanding filesystem to 120GB..."
+kpartx -av ${RESIZE_LOOP}
+sleep 2
+
+# Get partition device name
+RESIZE_LOOP_NAME=$(basename ${RESIZE_LOOP})
+RESIZE_PART="/dev/mapper/${RESIZE_LOOP_NAME}p2"
+
+if [ ! -b "${RESIZE_PART}" ]; then
+    echo "ERROR: Partition device ${RESIZE_PART} not found"
+    ls -la /dev/mapper/
+    kpartx -dv ${RESIZE_LOOP}
+    losetup -d ${RESIZE_LOOP}
+    exit 1
+fi
+
+echo "Root partition: ${RESIZE_PART}"
+
+# Run e2fsck (Debian Trixie e2fsprogs supports FEATURE_C12)
+echo "Running e2fsck..."
+e2fsck -f -y ${RESIZE_PART} || {
+    echo "WARNING: e2fsck reported errors, but continuing..."
+}
+
+# Resize filesystem to full 120GB
+echo "Running resize2fs to expand filesystem..."
+resize2fs ${RESIZE_PART}
+
+# Cleanup resize operations
+echo "Cleaning up resize operations..."
+kpartx -dv ${RESIZE_LOOP}
+losetup -d ${RESIZE_LOOP}
+sync
+sleep 3
+
+# Verify cleanup completed with retry loop
+echo "Verifying loop device cleanup..."
+CLEANUP_RETRY=0
+CLEANUP_MAX_RETRIES=5
+RESIZE_LOOP_NAME=$(basename ${RESIZE_LOOP})
+
+while [ $CLEANUP_RETRY -lt $CLEANUP_MAX_RETRIES ]; do
+    if losetup -a | grep -q "${RESIZE_LOOP_NAME}"; then
+        CLEANUP_RETRY=$((CLEANUP_RETRY + 1))
+        echo "WARNING: Loop device ${RESIZE_LOOP_NAME} still in use (attempt $CLEANUP_RETRY/$CLEANUP_MAX_RETRIES)"
+
+        if [ $CLEANUP_RETRY -lt $CLEANUP_MAX_RETRIES ]; then
+            echo "Forcing detach..."
+            losetup -d ${RESIZE_LOOP} 2>/dev/null || true
+            sync
+            CLEANUP_SLEEP=$((2 * CLEANUP_RETRY))
+            echo "Waiting ${CLEANUP_SLEEP} seconds..."
+            sleep $CLEANUP_SLEEP
+        else
+            echo "ERROR: Failed to detach loop device after $CLEANUP_MAX_RETRIES attempts"
+            echo "Active loop devices:"
+            losetup -a
+            exit 1
+        fi
+    else
+        echo "✅ Loop device ${RESIZE_LOOP_NAME} successfully detached"
+        break
+    fi
+done
+
+echo "✅ Filesystem resized to 120GB"
+cd /workspace
+
+# Verify base.img exists and is accessible
+if [ ! -f "work/base.img" ]; then
+    echo "ERROR: work/base.img not found after resize!"
+    ls -lha work/
+    exit 1
+fi
+
+# Step 6: Setup loop device for build operations
+echo ""
+echo "==> Setting up loop device for build..."
+
+# Retry loop device creation with exponential backoff
+RETRY_COUNT=0
+MAX_RETRIES=5
+LOOP_DEVICE=""
+
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    LOOP_DEVICE=$(losetup -f --show work/base.img 2>&1) && break
+
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+    echo "WARNING: Failed to create loop device (attempt $RETRY_COUNT/$MAX_RETRIES)"
+    echo "Error: $LOOP_DEVICE"
+
+    if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+        SLEEP_TIME=$((2 ** RETRY_COUNT))
+        echo "Retrying in ${SLEEP_TIME} seconds..."
+        sleep $SLEEP_TIME
+
+        # Clean up any stale loop devices
+        echo "Cleaning up stale loop devices..."
+        losetup -D 2>/dev/null || true
+        sync
+    fi
+done
+
+if [ -z "$LOOP_DEVICE" ] || [ ! -b "$LOOP_DEVICE" ]; then
+    echo "ERROR: Failed to create loop device after $MAX_RETRIES attempts"
     echo "Checking loop devices:"
     losetup -a
     echo "Checking base.img:"
-    ls -lh base.img
+    ls -lh work/base.img
+    echo "Checking /dev/loop*:"
+    ls -l /dev/loop* | head -20
     exit 1
-})
+fi
 echo "Loop device: ${LOOP_DEVICE}"
 
 # Use kpartx to create partition mappings (works in Docker)
@@ -172,40 +254,31 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Filesystem resize status
-if [ "${SKIP_IMAGE_RESIZE}" = "true" ]; then
-    echo "✅ Filesystem pre-resized to 120GB (done outside Docker)"
-    echo "   Image ready to use - no manual expansion needed"
-else
-    echo "⚠ Filesystem resize skipped - partition expanded but filesystem at original size"
-    echo "  You can expand manually with: sudo resize2fs /dev/sdX2"
-fi
-
 cd /workspace
 
-# Step 4: Mount partitions
+# Step 7: Mount partitions
 echo ""
 echo "==> Mounting partitions..."
 mkdir -p /tmp/boot /tmp/root
 mount ${ROOT_DEV} /tmp/root
 mount ${BOOT_DEV} /tmp/boot
 
-# Step 5: Install Kubernetes
+# Step 8: Install Kubernetes
 echo ""
 echo "==> Installing Kubernetes ${K8S_VERSION}..."
 ./image-build/scripts/01-install-k8s.sh /tmp/root "${K8S_VERSION}"
 
-# Step 6: Install and configure cloud-init
+# Step 9: Install and configure cloud-init
 echo ""
 echo "==> Installing and configuring cloud-init..."
 ./image-build/scripts/02-install-cloudinit.sh /tmp/root
 
-# Step 8: Cleanup and optimize
+# Step 10: Cleanup and optimize
 echo ""
 echo "==> Cleaning up and optimizing..."
 ./image-build/scripts/04-cleanup.sh /tmp/root
 
-# Step 9: Unmount and finalize
+# Step 11: Unmount and finalize
 echo ""
 echo "==> Unmounting partitions..."
 # Sync all pending writes
@@ -238,13 +311,13 @@ sleep 3
 
 trap - EXIT  # Remove trap
 
-# Step 10: Shrink image (DISABLED for testing - image will be larger)
+# Step 12: Shrink image (DISABLED for testing - image will be larger)
 echo ""
 echo "==> Skipping image shrinking (using unshrunk image for testing)..."
 
 cd /workspace
 
-# Step 11: Create output artifacts
+# Step 13: Create output artifacts
 echo ""
 echo "==> Creating output artifacts..."
 mkdir -p output
