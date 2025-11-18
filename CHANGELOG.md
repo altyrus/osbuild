@@ -350,16 +350,16 @@ wait_for_daemonset longhorn-system longhorn-csi-plugin 300
 ```
 Disk Requirements:
   - OS + System: 7GB (Debian 13, Kubernetes, containerd)
-  - MinIO PVC: 50GB (object storage)
+  - MinIO PVC: 40GB (object storage)
   - Grafana PVC: 10GB (metrics database)
   - Prometheus PVC: 10GB (time-series data)
   - Portainer PVC: 10GB (management data)
   - Longhorn overhead: 3GB
-  - Buffer for logs/temp: 30GB
-  Total: 120GB minimum
+  - Buffer for logs/temp: 20GB
+  Total: 100GB minimum
 ```
 
-**Solution:** Updated default disk sizes to 120GB in `config/base-images.conf`
+**Solution:** Updated default disk sizes to 100GB in `config/base-images.conf`
 
 **Validation:** All services now deploy successfully with adequate storage
 
@@ -375,7 +375,7 @@ Disk Requirements:
 - ✅ Bootstrap completes successfully (~18 minutes)
 - ✅ kubectl works for k8sadmin user
 - ✅ All 10 services deployed (K8s, Flannel, CoreDNS, MetalLB, NGINX Ingress, Longhorn, MinIO, Prometheus, Grafana, Portainer)
-- ✅ 120GB disk provides adequate storage
+- ✅ 100GB disk provides adequate storage
 - ✅ Fully autonomous zero-touch deployment achieved
 
 ### Files Modified
@@ -385,8 +385,8 @@ Disk Requirements:
    - Lines 306-308: Longhorn CSI deployment name correction
 
 2. **[config/base-images.conf](config/base-images.conf)**
-   - Line 28: X64_TARGET_SIZE="120G" (was 40G)
-   - Line 29: RPI5_TARGET_SIZE="120G" (was 4.5G)
+   - Line 28: X64_TARGET_SIZE="100G" (was 40G)
+   - Line 29: RPI5_TARGET_SIZE="100G" (was 4.5G)
 
 ---
 
@@ -423,7 +423,7 @@ done
 
 **File:** `config/base-images.conf`
 
-- Updated default disk sizes from 40GB to 120GB
+- Updated default disk sizes from 40GB to 100GB
 - Added rationale comments for sizing decisions
 - **Reason:** Full service stack (Longhorn, MinIO, Prometheus, Grafana) requires more space
 

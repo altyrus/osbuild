@@ -4,7 +4,7 @@
 # Uses Debian 13 (Trixie) cloud image as base
 #
 # LESSONS LEARNED (2025-11-07):
-# - 120GB disk required for full service stack (MinIO 50GB + services 30GB + OS 7GB + buffer 33GB)
+# - 100GB disk required for full service stack (MinIO 40GB + services 30GB + OS 7GB + buffer 23GB)
 # - 40GB insufficient: causes Longhorn PVC faults for MinIO/Grafana/Prometheus/Portainer
 # - Ensure partition expansion works: cloud-init-growroot must run on first boot
 #

@@ -77,11 +77,11 @@ fi
 echo "Original image size:"
 ls -lh work/base.img
 
-# Step 3: Resize image to 120GB
+# Step 3: Resize image to 100GB
 echo ""
-echo "==> Resizing image to 120GB..."
+echo "==> Resizing image to 100GB..."
 cd work
-qemu-img resize base.img 120G
+qemu-img resize base.img 100G
 
 echo "Resized image:"
 ls -lh base.img
@@ -107,7 +107,7 @@ sleep 2
 
 # Step 5: Expand filesystem using kpartx
 echo ""
-echo "==> Expanding filesystem to 120GB..."
+echo "==> Expanding filesystem to 100GB..."
 kpartx -av ${RESIZE_LOOP}
 sleep 2
 
@@ -131,7 +131,7 @@ e2fsck -f -y ${RESIZE_PART} || {
     echo "WARNING: e2fsck reported errors, but continuing..."
 }
 
-# Resize filesystem to full 120GB
+# Resize filesystem to full 100GB
 echo "Running resize2fs to expand filesystem..."
 resize2fs ${RESIZE_PART}
 
@@ -172,7 +172,7 @@ while [ $CLEANUP_RETRY -lt $CLEANUP_MAX_RETRIES ]; do
     fi
 done
 
-echo "✅ Filesystem resized to 120GB"
+echo "✅ Filesystem resized to 100GB"
 cd /workspace
 
 # Verify base.img exists and is accessible

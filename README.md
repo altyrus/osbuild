@@ -16,13 +16,13 @@ Automated OS image building and deployment system for x64 and Raspberry Pi 5 Kub
 ✅ SSH access and kubectl functionality
 ✅ Zero-touch deployment ready for production
 ✅ **Reliable Docker-based image builds with loop device race condition fixes**
-✅ **120GB image builds complete successfully**
+✅ **100GB image builds complete successfully**
 
 ### Recent Fixes (2025-11-08)
 ✅ Loop device race condition fixed in Docker builds
 ✅ 5-retry cleanup verification with linear backoff (2, 4, 6, 8, 10s)
 ✅ Exponential backoff retry for loop device creation (2, 4, 8, 16, 32s)
-✅ Build process now reliably handles large (120GB) images
+✅ Build process now reliably handles large (100GB) images
 ✅ Image structure validated - boot/root partitions correctly formatted
 
 ### Previous Fixes (2025-11-07)
@@ -309,7 +309,7 @@ nodes:
   - [x] Helper scripts for Docker-based verification
   - [x] Sector alignment fixes for image compatibility
   - [x] Loop device race condition fixes with retry logic
-  - [x] Reliable 120GB image builds
+  - [x] Reliable 100GB image builds
 - [x] **Phase 2: Testing & Validation** ✓ COMPLETED
   - [x] Static image verification (Docker-based)
   - [x] QEMU boot testing (validated partition structure, Pi-specific bootloader required for full boot)
